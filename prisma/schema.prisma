@@ -1,0 +1,36 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Record {
+  id        String   @id @default(uuid())
+  number    Int
+  machine   String
+  borrowAt  String
+  returnAt  String   @default("")
+  status    String   @default("completed")  // "borrowing" | "completed"
+  minutes   Int      @default(0)
+  baht      Int      @default(0)
+  coupon    Int      @default(0)
+  debt      Int      @default(0)
+  change    Int      @default(0)
+  reports   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

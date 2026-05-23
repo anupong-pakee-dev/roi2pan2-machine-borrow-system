@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #0f1117;
+  color: #e8e9f0;
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1d27; }
+::-webkit-scrollbar-thumb { background: #2e3248; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #f5a623; }
+
+/* Input focus ring */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+}
+
+/* Number input arrows hide */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-2xl p-6;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-ink font-semibold px-5 py-2.5 rounded-xl
+           hover:bg-amber-400 active:scale-95 transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-panel border border-border text-light font-medium px-5 py-2.5 rounded-xl
+           hover:border-accent hover:text-accent active:scale-95 transition-all duration-150;
+  }
+
+  .btn-danger {
+    @apply bg-accent2/10 border border-accent2/30 text-accent2 font-medium px-5 py-2.5 rounded-xl
+           hover:bg-accent2/20 active:scale-95 transition-all duration-150;
+  }
+
+  .input-field {
+    @apply w-full bg-panel border border-border text-light placeholder-muted
+           rounded-xl px-4 py-3 text-sm
+           focus:border-accent focus:ring-1 focus:ring-accent/30
+           transition-colors duration-150;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-muted uppercase tracking-widest mb-1.5;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-admin {
+    @apply badge bg-accent/15 text-accent border border-accent/30;
+  }
+
+  .badge-user {
+    @apply badge bg-blue-500/15 text-blue-400 border border-blue-500/30;
+  }
+
+  .stat-card {
+    @apply card flex flex-col gap-1;
+  }
+
+  .table-row {
+    @apply border-b border-border hover:bg-white/[0.02] transition-colors duration-100;
+  }
+}
+
+/* ── Mobile overrides ───────────────────────── */
+@media (max-width: 390px) {
+  .input-field {
+    @apply px-3 py-2.5 text-sm;
+  }
+  .btn-primary, .btn-secondary, .btn-danger {
+    @apply px-3 py-2 text-sm;
+  }
+  .label {
+    @apply text-[10px] mb-1;
+  }
+  .card {
+    @apply p-4 rounded-xl;
+  }
+}
