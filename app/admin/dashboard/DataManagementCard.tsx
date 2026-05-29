@@ -304,11 +304,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 /* ─── Action button in the grid ───────────────────────────────────────── */
 function ActionBtn({
-  icon, label, sub, color, onClick,
+  icon, label, sub, color, onClick, tutorialId,
 }: {
   icon: string; label: string; sub: string
   color: 'amber' | 'blue' | 'green' | 'red'
   onClick: () => void
+  tutorialId?: string
 }) {
   const colors = {
     amber: 'bg-amber-500/10 border-amber-500/20 hover:border-amber-400/50 hover:bg-amber-500/15',
@@ -326,6 +327,7 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
+      data-tutorial={tutorialId}
       className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border transition-all duration-150 active:scale-95 text-center ${colors[color]}`}
     >
       <span className="text-3xl">{icon}</span>
@@ -355,7 +357,7 @@ export default function DataManagementCard({ totalRecords }: Props) {
         />
       )}
 
-      <div className="card p-0 overflow-hidden">
+      <div data-tutorial="data-management" className="card p-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg shrink-0">
@@ -378,24 +380,28 @@ export default function DataManagementCard({ totalRecords }: Props) {
             icon="📊" label="Export Excel"
             sub="รายวัน หรือ รายเดือน"
             color="amber"
+            tutorialId="dm-export"
             onClick={() => setModal('export')}
           />
           <ActionBtn
             icon="💾" label="สำรองข้อมูล"
             sub="ดาวน์โหลด backup ทั้งหมด"
             color="blue"
+            tutorialId="dm-backup"
             onClick={() => setModal('backup')}
           />
           <ActionBtn
             icon="📥" label="นำเข้าข้อมูล"
             sub="กู้คืนจากไฟล์ backup"
             color="green"
+            tutorialId="dm-import"
             onClick={() => setModal('import')}
           />
           <ActionBtn
             icon="🗑" label="ล้างฐานข้อมูล"
             sub="ลบข้อมูลทั้งหมด"
             color="red"
+            tutorialId="dm-clear"
             onClick={() => setModal('clear')}
           />
         </div>

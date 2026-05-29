@@ -2,6 +2,8 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
+import ClockBadge from './ClockBadge'
+import ThemeToggle from './ThemeToggle'
 
 interface NavbarProps {
   username: string
@@ -20,121 +22,162 @@ export default function Navbar({ username, role }: NavbarProps) {
     router.refresh()
   }
 
+  const navItems = [
+    { href: '/dashboard',  label: 'หน้าจอเครื่อง', icon: IconGrid,   match: (p: string) => p === '/dashboard' },
+    { href: '/form',       label: 'ยืม',           icon: IconPlay,   match: (p: string) => p === '/form'      },
+    ...(role === 'admin'
+      ? [{ href: '/admin/dashboard', label: 'แอดมิน', icon: IconShield, match: (p: string) => p.startsWith('/admin') }]
+      : []),
+    ...(role === 'staff'
+      ? [{ href: '/staff/dashboard', label: 'รายงาน', icon: IconReport, match: (p: string) => p.startsWith('/staff') }]
+      : []),
+  ]
+
   return (
     <>
-      {/* Top bar */}
-      <header className="sticky top-0 z-40 border-b border-border bg-ink/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+      {/* Top bar — desktop + mobile head */}
+      <header className="sticky top-0 z-40 border-b border-border bg-surface">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2 group shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="1" width="6" height="6" rx="1" fill="#0f1117" />
-                <rect x="9" y="1" width="6" height="6" rx="1" fill="#0f1117" />
-                <rect x="1" y="9" width="6" height="6" rx="1" fill="#0f1117" />
-                <rect x="9" y="9" width="6" height="6" rx="1" fill="#0f1117" />
-              </svg>
+          <Link href="/dashboard" className="flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 rounded-[10px] bg-accent text-accent-ink
+                            grid place-items-center font-mono font-bold text-base tracking-tight">
+              M
             </div>
-            <span className="font-display font-bold text-light text-base tracking-tight group-hover:text-accent transition-colors">
+            <span className="font-display font-semibold text-light text-lg tracking-tight hidden sm:inline">
               MachineLog
             </span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            <NavLink href="/dashboard" active={pathname === '/dashboard'}>Dashboard</NavLink>
-            <NavLink href="/form" active={pathname === '/form'}>บันทึกใหม่</NavLink>
-            {role === 'admin' && (
-              <NavLink href="/admin/dashboard" active={pathname?.startsWith('/admin')}>Admin</NavLink>
-            )}
+          <nav className="hidden md:flex items-center gap-1 ml-6 flex-1">
+            {navItems.map(n => {
+              const active = n.match(pathname || '')
+              const Icon = n.icon
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className={[
+                    'flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-medium transition-all',
+                    active
+                      ? 'bg-light text-ink'
+                      : 'text-muted hover:text-light hover:bg-panel',
+                  ].join(' ')}
+                >
+                  <Icon />
+                  {n.label}
+                </Link>
+              )
+            })}
           </nav>
 
           {/* Right side */}
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-xs font-medium text-light leading-tight">{username}</span>
-              <span className={`text-[10px] ${role === 'admin' ? 'text-accent' : 'text-blue-400'}`}>{role}</span>
+          <div className="flex items-center gap-3 ml-auto md:ml-0">
+            <ClockBadge />
+            <div className="hidden sm:flex flex-col items-end leading-tight pl-3 border-l border-border ml-1">
+              <span className="text-xs font-semibold text-light">{username}</span>
+              <span className={`text-[10px] ${role === 'admin' ? 'text-accent' : 'text-muted'}`}>{role}</span>
             </div>
+            <div
+              className={[
+                'w-9 h-9 rounded-full grid place-items-center font-semibold text-sm',
+                role === 'admin' ? 'bg-accent text-accent-ink' : 'bg-panel text-light',
+              ].join(' ')}
+            >
+              {username[0]?.toUpperCase() || '?'}
+            </div>
+            <ThemeToggle />
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="btn-danger text-xs py-1.5 px-3"
+              className="w-9 h-9 rounded-lg bg-surface border border-border text-muted
+                         hover:text-accent2 hover:border-accent2 transition-colors
+                         flex items-center justify-center"
+              title="ออกจากระบบ"
             >
-              {loggingOut ? '...' : 'ออก'}
+              {loggingOut ? (
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : <IconLogout />}
             </button>
           </div>
         </div>
       </header>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-ink/95 backdrop-blur-md border-t border-border">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40
+                      bg-surface/95 backdrop-blur-md border-t border-border">
         <div className="flex items-center justify-around h-14 px-2">
-          <MobileNavLink href="/dashboard" active={pathname === '/dashboard'} icon={
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          }>Dashboard</MobileNavLink>
-
-          <MobileNavLink href="/form" active={pathname === '/form'} icon={
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <circle cx="12" cy="12" r="9" />
-              <path strokeLinecap="round" d="M12 8v8M8 12h8" />
-            </svg>
-          }>บันทึก</MobileNavLink>
-
-          {role === 'admin' && (
-            <MobileNavLink href="/admin/dashboard" active={pathname?.startsWith('/admin') ?? false} icon={
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" d="M12 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm-7 18a7 7 0 0 1 14 0" />
-              </svg>
-            }>Admin</MobileNavLink>
-          )}
-
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="flex flex-col items-center gap-1 px-3 py-2 text-accent2 active:opacity-70 transition-opacity"
-          >
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
-            </svg>
-            <span className="text-[10px]">{loggingOut ? '...' : 'ออก'}</span>
-          </button>
+          {navItems.map(n => {
+            const active = n.match(pathname || '')
+            const Icon = n.icon
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={[
+                  'flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg',
+                  active ? 'text-accent' : 'text-muted',
+                ].join(' ')}
+              >
+                <Icon />
+                <span className="text-[10px] font-medium">{n.label}</span>
+              </Link>
+            )
+          })}
         </div>
       </nav>
-
-      {/* Bottom nav spacer on mobile */}
       <div className="md:hidden h-14" aria-hidden />
     </>
   )
 }
 
-function NavLink({ href, children, active }: { href: string; children: React.ReactNode; active?: boolean }) {
+/* Icons */
+function IconGrid() {
   return (
-    <Link
-      href={href}
-      className={`px-4 py-2 text-sm rounded-lg transition-all duration-150 ${
-        active ? 'text-accent bg-accent/10' : 'text-muted hover:text-light hover:bg-white/5'
-      }`}
-    >
-      {children}
-    </Link>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3"  y="3"  width="7" height="7" rx="1.5"/>
+      <rect x="14" y="3"  width="7" height="7" rx="1.5"/>
+      <rect x="3"  y="14" width="7" height="7" rx="1.5"/>
+      <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+    </svg>
+  )
+}
+function IconPlay() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="6 4 20 12 6 20 6 4" />
+    </svg>
+  )
+}
+function IconShield() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2 4 6v6c0 4.5 3.5 8.5 8 10 4.5-1.5 8-5.5 8-10V6l-8-4Z" />
+    </svg>
+  )
+}
+function IconReport() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
   )
 }
 
-function MobileNavLink({ href, children, active, icon }: {
-  href: string; children: React.ReactNode; active: boolean; icon: React.ReactNode
-}) {
+function IconLogout() {
   return (
-    <Link
-      href={href}
-      className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all ${
-        active ? 'text-accent' : 'text-muted'
-      }`}
-    >
-      {icon}
-      <span className="text-[10px] font-medium">{children}</span>
-    </Link>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
   )
 }

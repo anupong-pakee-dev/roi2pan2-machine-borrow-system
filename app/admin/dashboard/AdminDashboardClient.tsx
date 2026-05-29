@@ -1,437 +1,994 @@
 'use client'
-import { useState, useMemo, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import ThaiDatePicker from '@/components/ThaiDatePicker'
+import FilterPanel, { FilterState } from '@/components/FilterPanel'
+import DataManagementCard from './DataManagementCard'
+import { toISODate, fmtDateTH } from '@/lib/format'
+import TutorialOverlay, { TutorialHelpButton, TutorialStep, useTutorial } from '@/components/Tutorial'
 
-interface Record {
+const ADMIN_STEPS: TutorialStep[] = [
+  {
+    title: 'ยินดีต้อนรับหน้า Admin 🛡️',
+    body: 'หน้านี้ใช้สำหรับดูรายงาน จัดการข้อมูลการยืม-คืน และผู้ใช้ทั้งหมด\nมาทำความรู้จักแต่ละส่วนกัน!',
+    target: null,
+  },
+  {
+    title: '📊 ตัวเลขสรุป',
+    body: 'แสดงยอดรวมตามช่วงเวลาที่เลือก\n• ยอดสุทธิ (หักหนี้แล้ว)\n• หนี้ค้างชำระ\n• นาทีรวม\n• คูปองที่ใช้',
+    target: '[data-tutorial="admin-stats"]',
+    placement: 'bottom',
+  },
+  {
+    title: '🗂️ แท็บและตัวกรองช่วงเวลา',
+    body: 'เลือกดูข้อมูลตามช่วงเวลา\n• วันนี้ · วันเดียว · ช่วงวัน · ทั้งหมด\nกรองเพิ่มด้วย เครื่อง · วิธีชำระ · ค้นหา',
+    target: '[data-tutorial="admin-filter"]',
+    placement: 'bottom',
+  },
+  {
+    title: '📋 ตารางรายการ',
+    body: 'แสดงทุกรายการพร้อมวันเวลายืม-คืน ยอดเงิน คูปอง หนี้\n• 🗑️ ปุ่มแดง = ลบรายการ\n• 💳 ปุ่มเหลือง = จ่ายย้อนหลัง (เฉพาะรายที่มีหนี้ค้าง)',
+    target: '[data-tutorial="admin-table"]',
+    placement: 'top',
+  },
+  {
+    title: '💳 จ่ายย้อนหลัง',
+    body: 'รายการที่มีหนี้ค้างชำระ (คอลัมน์ "หนี้" มีตัวเลขสีแดง)\nกดปุ่มสีเหลืองเพื่อบันทึกการจ่ายในภายหลัง\nระบุเงินสดหรือคูปอง ยอดหนี้จะอัปเดตทันที',
+    target: null,
+  },
+  {
+    title: '👥 จัดการผู้ใช้',
+    body: 'สลับมาที่แท็บ "ผู้ใช้" เพื่อ\n• ดูรายชื่อผู้ใช้ทั้งหมด\n• เพิ่มผู้ใช้ใหม่\n• ลบผู้ใช้ (ลบตัวเองไม่ได้)',
+    target: '[data-tutorial="admin-tabs"]',
+    placement: 'bottom',
+  },
+  {
+    title: '🛡️ ส่วนจัดการข้อมูล',
+    body: 'ด้านล่างสุดของหน้ามีเครื่องมือจัดการฐานข้อมูล 4 อย่าง\nแต่ละปุ่มมีหน้าที่ต่างกัน มาดูทีละอันเลย!',
+    target: '[data-tutorial="data-management"]',
+    placement: 'top',
+  },
+  {
+    title: '📊 Export Excel',
+    body: 'ดาวน์โหลดข้อมูลเป็นไฟล์ CSV เปิดด้วย Excel ได้เลย\n• รายวัน — เลือกวันที่ต้องการ\n• รายเดือน — เลือกเดือน\nเหมาะสำหรับทำรายงานส่งหรือวิเคราะห์ยอด',
+    target: '[data-tutorial="dm-export"]',
+    placement: 'top',
+  },
+  {
+    title: '💾 สำรองข้อมูล (Backup)',
+    body: 'ดาวน์โหลดข้อมูลทั้งหมดในฐานข้อมูลเป็นไฟล์ CSV ครั้งเดียว\nแนะนำให้ทำสม่ำเสมอเพื่อป้องกันข้อมูลสูญหาย\nไฟล์ backup สามารถนำเข้ากลับได้ในภายหลัง',
+    target: '[data-tutorial="dm-backup"]',
+    placement: 'top',
+  },
+  {
+    title: '📥 นำเข้าข้อมูล (Import)',
+    body: 'กู้คืนข้อมูลจากไฟล์ backup ที่เคย Export ไว้\n• ใช้ได้เฉพาะไฟล์ backup จากระบบนี้\n• รายการ ID ซ้ำจะถูกข้ามโดยอัตโนมัติ\n• ข้อมูลเดิมในระบบจะไม่ถูกลบ',
+    target: '[data-tutorial="dm-import"]',
+    placement: 'top',
+  },
+  {
+    title: '🗑️ ล้างฐานข้อมูล',
+    body: '⚠️ ระวัง! ปุ่มนี้ลบข้อมูลบันทึกทั้งหมดถาวร\nแนะนำให้ทำ Backup ก่อนเสมอ\nต้องพิมพ์ข้อความยืนยันก่อน — ระบบออกแบบมาเพื่อป้องกันการกดผิด',
+    target: '[data-tutorial="dm-clear"]',
+    placement: 'top',
+  },
+  {
+    title: 'พร้อมแล้ว! 🎉',
+    body: 'คุณรู้จักทุกฟีเจอร์แล้ว\nกดปุ่ม ? มุมล่างขวาเพื่อดู Tutorial นี้อีกครั้งได้เสมอ',
+    target: null,
+  },
+]
+
+interface BulkPayResult {
+  id: string
+  newDebt: number
+  newCoupon: number
+  newChange: number
+}
+
+interface RecordRow {
   id: string
   number: number
   machine: string
+  status: string
   borrowAt: string
-  returnAt: string
+  returnAt: string | null
   minutes: number
   baht: number
   coupon: number
   debt: number
   change: number
   reports: string | null
-  status: string
+  createdAt: Date | string
+}
+
+interface UserRow {
+  id: string
+  username: string
+  role: string
   createdAt: Date | string
 }
 
 interface Props {
-  records: Record[]
+  records: RecordRow[]
+  users: UserRow[]
+  currentUserId: string
+  readOnly?: boolean
 }
 
-// แปลงเป็น YYYY-MM-DD ตาม timezone ไทย (UTC+7) เพื่อป้องกันวันคลาดเคลื่อน
-function toISODate(d: Date | string) {
-  const date = typeof d === 'string' ? new Date(d) : d
-  const thaiOffset = 7 * 60
-  const localTime = new Date(date.getTime() + thaiOffset * 60 * 1000)
-  return localTime.toISOString().slice(0, 10)
-}
-
-function todayThaiISO() {
-  const now = new Date()
-  const thaiOffset = 7 * 60
-  const localTime = new Date(now.getTime() + thaiOffset * 60 * 1000)
-  return localTime.toISOString().slice(0, 10)
-}
-
-function toThaiDate(d: Date | string) {
-  const date = typeof d === 'string' ? new Date(d) : d
-  return date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit', calendar: 'buddhist' } as Intl.DateTimeFormatOptions)
-}
-
-function IconDownload() {
-  return (
-    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-    </svg>
-  )
-}
-function IconUpload() {
-  return (
-    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-    </svg>
-  )
-}
-function IconTrash() {
-  return (
-    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-    </svg>
-  )
-}
-function IconShield() {
-  return (
-    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-    </svg>
-  )
-}
-function IconSpinner() {
-  return (
-    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  )
-}
-
-export default function AdminDashboardClient({ records: initialRecords }: Props) {
+export default function AdminDashboardClient({ records: initialRecords, users: initialUsers, currentUserId, readOnly = false }: Props) {
   const router = useRouter()
   const [records, setRecords] = useState(initialRecords)
-  const [confirmTarget, setConfirmTarget] = useState<Record | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [viewMode, setViewMode] = useState<'today' | 'all'>('all')
-  const [selectedDate, setSelectedDate] = useState<string>(todayThaiISO())
+  const [users,   setUsers]   = useState(initialUsers)
 
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [exportMode, setExportMode] = useState<'daily' | 'monthly'>('daily')
-  const [exportDate, setExportDate] = useState(todayThaiISO())
-  const [exportMonth, setExportMonth] = useState(todayThaiISO().slice(0, 7))
-  const [exporting, setExporting] = useState(false)
+  const [tab, setTab] = useState<'records' | 'users'>('records')
+  const [viewMode, setViewMode]   = useState<'today' | 'date' | 'range' | 'all'>('all')
+  const [selectedDate, setSelectedDate] = useState(toISODate(new Date()))
+  const [selectedDateEnd, setSelectedDateEnd] = useState(toISODate(new Date()))
+  const [filters, setFilters]     = useState<FilterState>({ machine: '', payMethod: '', search: '' })
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [deleting, setDeleting]       = useState<string | null>(null)
+  const [payingRecord, setPayingRecord] = useState<RecordRow | null>(null)
+  const [selectedIds, setSelectedIds]  = useState<Set<string>>(new Set())
+  const [showBulkPay, setShowBulkPay]  = useState(false)
+  const tut = useTutorial('machinelog_tutorial_admin_v1')
 
-  const [showDataModal, setShowDataModal] = useState(false)
-  const [dataTab, setDataTab] = useState<'backup' | 'import' | 'clear'>('backup')
-  const [backingUp, setBackingUp] = useState(false)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null)
-  const [importError, setImportError] = useState('')
-  const [clearConfirm, setClearConfirm] = useState('')
-  const [clearing, setClearing] = useState(false)
-  const [clearResult, setClearResult] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const today = toISODate(new Date())
+  const todayRecords = records.filter(r => toISODate(r.createdAt) === today)
 
-  const displayed = useMemo(() => {
-    if (viewMode === 'today') return records.filter(r => toISODate(r.createdAt) === selectedDate)
+  const baseRecords = useMemo(() => {
+    if (viewMode === 'today') return todayRecords
+    if (viewMode === 'date')  return records.filter(r => toISODate(r.createdAt) === selectedDate)
+    if (viewMode === 'range') return records.filter(r => {
+      const d = toISODate(r.createdAt)
+      return d >= selectedDate && d <= (selectedDateEnd || selectedDate)
+    })
     return records
-  }, [records, viewMode, selectedDate])
+  }, [records, viewMode, selectedDate, selectedDateEnd, todayRecords])
+
+  const machines = useMemo(() => {
+    const set = new Set(records.map(r => r.machine))
+    return Array.from(set).sort((a, b) => {
+      const na = parseInt(a.replace(/\D/g, '')) || 0
+      const nb = parseInt(b.replace(/\D/g, '')) || 0
+      return na - nb || a.localeCompare(b)
+    })
+  }, [records])
+
+  const filteredRecords = useMemo(() => baseRecords.filter(r => {
+    if (filters.machine && r.machine !== filters.machine) return false
+    if (filters.payMethod === 'cash'   && !(r.coupon === 0 && r.baht > 0)) return false
+    if (filters.payMethod === 'coupon' && !(r.coupon > 0)) return false
+    if (filters.payMethod === 'debt'   && !(r.debt > 0))   return false
+    if (filters.search) {
+      const q = filters.search.toLowerCase()
+      const hay = `${r.number} ${r.machine} ${r.reports || ''}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  }), [baseRecords, filters])
 
   const stats = useMemo(() => ({
-    count: displayed.length,
-    minutes: displayed.reduce((s, r) => s + r.minutes, 0),
-    baht: displayed.reduce((s, r) => s + r.baht, 0),
-    debt: displayed.reduce((s, r) => s + r.debt, 0),
-    coupon: displayed.reduce((s, r) => s + r.coupon, 0),
-  }), [displayed])
+    count:   filteredRecords.length,
+    minutes: filteredRecords.reduce((s, r) => s + r.minutes, 0),
+    baht:    filteredRecords.reduce((s, r) => s + r.baht, 0),
+    coupon:  filteredRecords.reduce((s, r) => s + r.coupon, 0),
+    debt:    filteredRecords.reduce((s, r) => s + r.debt, 0),
+    net:     filteredRecords.reduce((s, r) => s + r.baht - r.debt, 0),
+  }), [filteredRecords])
 
-  // ยอดเงินบาททั้งหมด = ยอดเงินบาททั้งหมด - ยอดค้างทั้งหมด
-  const netBaht = stats.baht - stats.debt
-
-  async function handleExport() {
-    setExporting(true)
+  async function deleteRecord(id: string) {
+    if (!confirm('ลบรายการนี้?')) return
+    setDeleting(id)
     try {
-      const mode = exportMode
-      const date = exportMode === 'daily' ? exportDate : exportMonth
-      const res = await fetch(`/api/admin/export?mode=${mode}&date=${date}`)
-      if (!res.ok) { const d = await res.json(); alert(d.error || 'Export ไม่สำเร็จ'); return }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `บันทึก-${mode === 'daily' ? 'วันที่' : 'เดือน'}-${date}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      setShowExportModal(false)
-    } finally { setExporting(false) }
+      const res = await fetch(`/api/records/${id}`, { method: 'DELETE' })
+      if (res.ok) setRecords(rs => rs.filter(r => r.id !== id))
+    } finally { setDeleting(null) }
   }
 
-  async function handleBackup() {
-    setBackingUp(true)
-    try {
-      const res = await fetch('/api/admin/backup')
-      if (!res.ok) { alert('สำรองข้อมูลไม่สำเร็จ'); return }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `backup-${todayThaiISO()}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally { setBackingUp(false) }
+  // ── selection helpers ──────────────────────────────────────────────
+  const debtIds = useMemo(() => filteredRecords.filter(r => r.debt > 0).map(r => r.id), [filteredRecords])
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
-  async function handleImport() {
-    if (!importFile) return
-    setImporting(true); setImportResult(null); setImportError('')
-    try {
-      const fd = new FormData(); fd.append('file', importFile)
-      const res = await fetch('/api/admin/import', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) { setImportError(data.error || 'นำเข้าข้อมูลไม่สำเร็จ') }
-      else { setImportResult({ imported: data.imported, skipped: data.skipped }); router.refresh() }
-    } catch { setImportError('เกิดข้อผิดพลาดในการอัปโหลด') }
-    finally { setImporting(false) }
+  function toggleSelectAll() {
+    setSelectedIds(prev =>
+      prev.size === debtIds.length ? new Set() : new Set(debtIds)
+    )
   }
 
-  async function handleClear() {
-    if (clearConfirm !== 'ยืนยันลบข้อมูลทั้งหมด') return
-    setClearing(true); setClearResult('')
-    try {
-      const res = await fetch('/api/admin/clear', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: 'ยืนยันลบข้อมูลทั้งหมด' }),
-      })
-      const data = await res.json()
-      if (res.ok) { setClearResult(`ลบข้อมูลสำเร็จ ${data.deleted} รายการ`); setRecords([]); setClearConfirm(''); router.refresh() }
-      else { setClearResult(data.error || 'ล้างข้อมูลไม่สำเร็จ') }
-    } finally { setClearing(false) }
+  function clearSelection() { setSelectedIds(new Set()) }
+
+  // ── bulk pay ───────────────────────────────────────────────────────
+  async function bulkPayRecords(results: BulkPayResult[]) {
+    await Promise.all(results.map(({ id, newDebt, newCoupon, newChange }) => {
+      const r = records.find(x => x.id === id)!
+      return fetch(`/api/records/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnAt: r.returnAt || '',
+          minutes: r.minutes, baht: r.baht,
+          coupon: newCoupon, debt: newDebt, change: newChange,
+          reports: r.reports,
+        }),
+      }).then(res => res.ok ? res.json() : null)
+    })).then(updated => {
+      setRecords(rs => rs.map(r => {
+        const u = updated.find((x: RecordRow | null) => x?.id === r.id)
+        return u ? { ...r, ...u } : r
+      }))
+    })
+    setSelectedIds(new Set())
+    setShowBulkPay(false)
   }
 
-  async function handleDelete() {
-    if (!confirmTarget) return
-    setDeleting(true)
-    try {
-      const res = await fetch(`/api/records/${confirmTarget.id}`, { method: 'DELETE' })
-      if (res.ok) { setRecords(prev => prev.filter(r => r.id !== confirmTarget.id)); setConfirmTarget(null) }
-    } finally { setDeleting(false) }
+  async function payRecord(id: string, cashPaid: number, couponPaid: number) {
+    const r = records.find(x => x.id === id)
+    if (!r) return
+    const totalPaid = cashPaid + couponPaid
+    const newDebt   = Math.max(0, r.debt - totalPaid)
+    const newChange = Math.max(0, totalPaid - r.debt)
+    const newCoupon = r.coupon + couponPaid
+
+    const res = await fetch(`/api/records/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        returnAt: r.returnAt || '',
+        minutes:  r.minutes,
+        baht:     r.baht,
+        coupon:   newCoupon,
+        debt:     newDebt,
+        change:   newChange,
+        reports:  r.reports,
+      }),
+    })
+    if (res.ok) {
+      const updated: RecordRow = await res.json()
+      setRecords(rs => rs.map(x => x.id === id ? { ...x, ...updated } : x))
+    }
+    setPayingRecord(null)
   }
 
-  const closeDataModal = () => { setShowDataModal(false); setImportResult(null); setImportError(''); setClearResult('') }
+  async function deleteUser(id: string) {
+    if (id === currentUserId) return alert('ลบตัวเองไม่ได้')
+    if (!confirm('ลบผู้ใช้นี้?')) return
+    setDeleting(id)
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+      if (res.ok) setUsers(us => us.filter(u => u.id !== id))
+    } finally { setDeleting(null) }
+  }
 
   return (
-    <>
-      {/* Delete single confirm */}
-      {confirmTarget && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-surface border border-border rounded-2xl p-5 w-full max-w-sm shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-accent2/15 border border-accent2/30 flex items-center justify-center text-accent2 shrink-0"><IconTrash /></div>
-              <div>
-                <p className="font-semibold text-light text-sm">ยืนยันการลบ</p>
-                <p className="text-xs text-muted mt-0.5">รายการนี้จะถูกลบถาวร ไม่สามารถกู้คืนได้</p>
-              </div>
-            </div>
-            <div className="bg-panel rounded-xl p-3 mb-4 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted">เลขที่</span><span className="font-mono text-accent font-semibold">#{confirmTarget.number}</span></div>
-              <div className="flex justify-between"><span className="text-muted">เครื่อง</span><span className="font-mono text-light">{confirmTarget.machine}</span></div>
-              <div className="flex justify-between"><span className="text-muted">เวลา</span><span className="font-mono text-light">{confirmTarget.borrowAt} → {confirmTarget.returnAt}</span></div>
-              <div className="flex justify-between"><span className="text-muted">ค่าบริการ</span><span className="font-mono text-green-400">{confirmTarget.baht} บาท</span></div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setConfirmTarget(null)} disabled={deleting} className="btn-secondary flex-1 text-sm py-2">ยกเลิก</button>
-              <button onClick={handleDelete} disabled={deleting} className="btn-danger flex-1 text-sm py-2 flex items-center justify-center gap-2">
-                {deleting ? <IconSpinner /> : <IconTrash />}
-                {deleting ? 'กำลังลบ...' : 'ลบรายการ'}
-              </button>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-5">
+      {/* Tutorial */}
+      {tut.ready && (
+        <>
+          <TutorialOverlay
+            steps={ADMIN_STEPS}
+            active={tut.active}
+            step={tut.step}
+            onNext={() => tut.next(ADMIN_STEPS.length)}
+            onPrev={tut.prev}
+            onSkip={tut.finish}
+          />
+          {!tut.active && <TutorialHelpButton onClick={tut.start} />}
+        </>
       )}
 
-      {/* Export Modal */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0"><IconDownload /></div>
-              <div>
-                <p className="font-semibold text-light">Export Excel</p>
-                <p className="text-xs text-muted mt-0.5">เลือกช่วงเวลาที่ต้องการ export</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 bg-panel border border-border rounded-xl p-1 mb-4">
-              <button onClick={() => setExportMode('daily')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${exportMode === 'daily' ? 'bg-accent text-ink' : 'text-muted hover:text-light'}`}>รายวัน</button>
-              <button onClick={() => setExportMode('monthly')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${exportMode === 'monthly' ? 'bg-accent text-ink' : 'text-muted hover:text-light'}`}>รายเดือน</button>
-            </div>
-            {exportMode === 'daily' ? (
-              <div className="mb-4">
-                <label className="label">เลือกวันที่</label>
-                <ThaiDatePicker value={exportDate} onChange={setExportDate} />
-              </div>
-            ) : (
-              <div className="mb-4">
-                <label className="label">เลือกเดือน</label>
-                <input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)} className="input-field" />
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button onClick={() => setShowExportModal(false)} className="btn-secondary flex-1 text-sm py-2">ยกเลิก</button>
-              <button onClick={handleExport} disabled={exporting} className="btn-primary flex-1 text-sm py-2 flex items-center justify-center gap-2">
-                {exporting ? <IconSpinner /> : <IconDownload />}
-                {exporting ? 'กำลัง Export...' : 'Export'}
-              </button>
-            </div>
+      {/* Stats */}
+      <div data-tutorial="admin-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="stat-card stat-card-accent">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/60">ยอดสุทธิ (หักหนี้)</div>
+          <div className="font-mono tabular-nums text-4xl font-bold leading-tight text-accent">
+            ฿{stats.net.toLocaleString()}
           </div>
+          <div className="text-xs text-ink/55">{stats.count} รายการ</div>
         </div>
-      )}
+        <Stat label="หนี้ค้างชำระ" value={`฿${stats.debt.toLocaleString()}`}
+              sub={`${filteredRecords.filter(r => r.debt > 0).length} รายการ`} danger />
+        <Stat label="นาทีรวม" value={stats.minutes.toLocaleString()}
+              sub={`≈ ${Math.round(stats.minutes / 60)} ชั่วโมง`} />
+        <Stat label="คูปองที่ใช้" value={`฿${stats.coupon.toLocaleString()}`}
+              sub={`${filteredRecords.filter(r => r.coupon > 0).length} รายการ`} />
+      </div>
 
-      {/* Data Management Modal */}
-      {showDataModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0"><IconShield /></div>
-                <div>
-                  <p className="font-semibold text-light">จัดการข้อมูล</p>
-                  <p className="text-xs text-muted mt-0.5">สำรอง นำเข้า และล้างฐานข้อมูล</p>
-                </div>
-              </div>
-              <button onClick={closeDataModal} className="text-muted hover:text-light transition-colors">
-                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            <div className="flex gap-1 bg-panel border border-border rounded-xl p-1 mb-5">
-              {(['backup', 'import', 'clear'] as const).map(tab => (
-                <button key={tab} onClick={() => { setDataTab(tab); setImportResult(null); setImportError(''); setClearResult('') }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${dataTab === tab ? (tab === 'clear' ? 'bg-accent2/80 text-white' : 'bg-accent text-ink') : 'text-muted hover:text-light'}`}>
-                  {tab === 'backup' ? '💾 สำรองข้อมูล' : tab === 'import' ? '📥 นำเข้า' : '🗑 ล้างข้อมูล'}
-                </button>
-              ))}
-            </div>
-
-            {dataTab === 'backup' && (
-              <div className="space-y-4">
-                <div className="bg-panel rounded-xl p-4 border border-border text-sm text-muted space-y-1.5">
-                  <p className="text-light font-medium mb-2">📋 รายละเอียด</p>
-                  <p>• Export ข้อมูลทั้งหมดในฐานข้อมูลเป็นไฟล์ CSV</p>
-                  <p>• ไฟล์นี้สามารถนำกลับเข้าระบบได้ผ่านแท็บ "นำเข้า"</p>
-                  <p>• รวมข้อมูลทั้งหมด <span className="text-accent font-semibold">{records.length}</span> รายการ</p>
-                </div>
-                <button onClick={handleBackup} disabled={backingUp} className="btn-primary w-full flex items-center justify-center gap-2">
-                  {backingUp ? <IconSpinner /> : <IconDownload />}
-                  {backingUp ? 'กำลังสำรองข้อมูล...' : 'ดาวน์โหลดไฟล์สำรอง'}
-                </button>
-              </div>
-            )}
-
-            {dataTab === 'import' && (
-              <div className="space-y-4">
-                <div className="bg-panel rounded-xl p-4 border border-border text-sm text-muted space-y-1.5">
-                  <p className="text-light font-medium mb-2">📋 รายละเอียด</p>
-                  <p>• ใช้ไฟล์ backup ที่ได้จากระบบนี้เท่านั้น</p>
-                  <p>• รายการที่มี ID ซ้ำจะถูกข้ามโดยอัตโนมัติ</p>
-                  <p>• ไม่มีการลบข้อมูลเดิมออก</p>
-                </div>
-                <div className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-accent/50 transition-colors" onClick={() => fileInputRef.current?.click()}>
-                  <div className="text-3xl mb-2">📁</div>
-                  <p className="text-light text-sm font-medium">{importFile ? importFile.name : 'คลิกเพื่อเลือกไฟล์ CSV'}</p>
-                  <p className="text-muted text-xs mt-1">รองรับเฉพาะไฟล์ .csv จากระบบ</p>
-                  <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={e => { setImportFile(e.target.files?.[0] || null); setImportResult(null); setImportError('') }} />
-                </div>
-                {importError && <div className="bg-accent2/10 border border-accent2/30 rounded-xl p-3 text-accent2 text-sm">{importError}</div>}
-                {importResult && (
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-green-400 text-sm">
-                    ✅ นำเข้าสำเร็จ <strong>{importResult.imported}</strong> รายการ (ข้าม <strong>{importResult.skipped}</strong> รายการซ้ำ)
-                  </div>
-                )}
-                <button onClick={handleImport} disabled={!importFile || importing} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                  {importing ? <IconSpinner /> : <IconUpload />}
-                  {importing ? 'กำลังนำเข้า...' : 'นำเข้าข้อมูล'}
-                </button>
-              </div>
-            )}
-
-            {dataTab === 'clear' && (
-              <div className="space-y-4">
-                <div className="bg-accent2/5 border border-accent2/20 rounded-xl p-4 text-sm space-y-1.5">
-                  <p className="text-accent2 font-semibold mb-2">⚠️ คำเตือน: การดำเนินการนี้ไม่สามารถยกเลิกได้</p>
-                  <p className="text-muted">• จะลบข้อมูลบันทึกทั้งหมด <span className="text-accent2 font-semibold">{records.length}</span> รายการ</p>
-                  <p className="text-muted">• บัญชีผู้ใช้งานจะไม่ถูกลบ</p>
-                  <p className="text-muted">• แนะนำให้สำรองข้อมูลก่อนดำเนินการ</p>
-                </div>
-                <div>
-                  <label className="label">พิมพ์ข้อความยืนยัน</label>
-                  <p className="text-xs text-muted mb-2">พิมพ์: <span className="font-mono text-accent2">ยืนยันลบข้อมูลทั้งหมด</span></p>
-                  <input type="text" value={clearConfirm} onChange={e => { setClearConfirm(e.target.value); setClearResult('') }} placeholder="พิมพ์ข้อความยืนยัน..." className="input-field" />
-                </div>
-                {clearResult && (
-                  <div className={`rounded-xl p-3 text-sm ${clearResult.startsWith('ลบข้อมูลสำเร็จ') ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-accent2/10 border border-accent2/30 text-accent2'}`}>{clearResult}</div>
-                )}
-                <button onClick={handleClear} disabled={clearConfirm !== 'ยืนยันลบข้อมูลทั้งหมด' || clearing} className="btn-danger w-full flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                  {clearing ? <IconSpinner /> : <IconTrash />}
-                  {clearing ? 'กำลังล้างข้อมูล...' : 'ล้างฐานข้อมูลทั้งหมด'}
-                </button>
-              </div>
-            )}
-          </div>
+      {/* Tab + add user */}
+      <div className="flex justify-between items-center gap-3 flex-wrap">
+        <div data-tutorial="admin-tabs" className="bg-surface border border-border rounded-xl p-1 flex gap-1">
+          {(([
+            ['records', `รายการทั้งหมด · ${records.length}`],
+            ...(!readOnly ? [['users', `ผู้ใช้ · ${users.length}`]] : []),
+          ]) as ['records' | 'users', string][]).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={[
+                'h-9 px-4 rounded-lg text-sm font-medium transition-all',
+                tab === k ? 'bg-light text-ink' : 'text-muted hover:text-light',
+              ].join(' ')}
+            >{label}</button>
+          ))}
         </div>
-      )}
-
-      {/* Records table */}
-      <div className="card p-0 overflow-hidden">
-        <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display font-semibold text-light">รายการบันทึก</h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-panel border border-border rounded-xl p-1">
-              <button onClick={() => setViewMode('today')} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${viewMode === 'today' ? 'bg-accent text-ink' : 'text-muted hover:text-light'}`}>วันที่เลือก</button>
-              <button onClick={() => setViewMode('all')} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${viewMode === 'all' ? 'bg-accent text-ink' : 'text-muted hover:text-light'}`}>ทั้งหมด</button>
-            </div>
-            {viewMode === 'today' && (
-              <ThaiDatePicker value={selectedDate} onChange={setSelectedDate} className="w-52" />
-            )}
-            <button onClick={() => setShowExportModal(true)} className="btn-secondary flex items-center gap-2 text-sm py-2">
-              <IconDownload />Export Excel
-            </button>
-          </div>
-        </div>
-
-        {/* Summary bar — ยอดเงินบาททั้งหมด = ยอดเงินบาททั้งหมด - ยอดค้างทั้งหมด */}
-        <div className="px-6 py-3 border-b border-border bg-panel/30 flex flex-wrap gap-4 text-sm">
-          <span className="text-muted">{displayed.length} รายการ</span>
-          <span className="text-blue-400">{stats.minutes} นาที</span>
-          <span className="text-green-400">ยอดเงินบาท {netBaht.toLocaleString()} บาท</span>
-          <span className="text-yellow-400">คูปอง {stats.coupon.toLocaleString()} บาท</span>
-          <span className="text-accent2">ค้าง {stats.debt.toLocaleString()} บาท</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                {['เลขที่','เครื่อง','ยืม','คืน','นาที','บาท','คูปอง','ยอดค้าง','เงินจ่าย','หมายเหตุ','วันที่',''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayed.length === 0 ? (
-                <tr><td colSpan={12} className="text-center py-12 text-muted">ไม่มีรายการในช่วงที่เลือก</td></tr>
-              ) : displayed.map(r => (
-                <tr key={r.id} className="table-row">
-                  <td className="px-4 py-3 font-mono text-accent font-semibold">{r.number}</td>
-                  <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-lg bg-panel border border-border text-xs font-mono">{r.machine}</span></td>
-                  <td className="px-4 py-3 font-mono text-light">{r.borrowAt}</td>
-                  <td className="px-4 py-3 font-mono text-light">{r.returnAt || '—'}</td>
-                  <td className="px-4 py-3 text-blue-400 font-medium">{r.minutes}</td>
-                  <td className="px-4 py-3 text-green-400 font-medium">{r.baht}</td>
-                  <td className="px-4 py-3 text-yellow-400">{r.coupon || '—'}</td>
-                  <td className="px-4 py-3 text-accent2 font-medium">{r.debt || '—'}</td>
-                  <td className="px-4 py-3 text-muted">{r.change || '—'}</td>
-                  <td className="px-4 py-3 text-muted text-xs max-w-[100px] truncate">{r.reports || '—'}</td>
-                  <td className="px-4 py-3 text-muted text-xs whitespace-nowrap">{toThaiDate(r.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => setConfirmTarget(r)} className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg bg-accent2/10 border border-accent2/20 text-accent2 flex items-center justify-center hover:bg-accent2/20 transition-all" title="ลบรายการ">
-                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {displayed.length > 0 && (
-              <tfoot>
-                <tr className="border-t-2 border-border bg-panel/50">
-                  <td colSpan={4} className="px-4 py-3 text-xs text-muted font-medium uppercase">รวม</td>
-                  <td className="px-4 py-3 text-blue-400 font-bold">{stats.minutes}</td>
-                  {/* ยอดเงินบาททั้งหมด = ยอดเงินบาททั้งหมด - ยอดค้างทั้งหมด */}
-                  <td className="px-4 py-3 text-green-400 font-bold">{netBaht.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-yellow-400 font-bold">{stats.coupon.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-accent2 font-bold">{stats.debt.toLocaleString()}</td>
-                  <td colSpan={4}></td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
+        <div className="flex items-center gap-3">
+          {readOnly && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-panel border border-border
+                             text-xs text-muted font-medium">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              ดูข้อมูลอย่างเดียว
+            </span>
+          )}
+          {tab === 'users' && !readOnly && (
+            <button className="btn-primary" onClick={() => setShowAddUser(true)}>+ เพิ่มผู้ใช้</button>
+          )}
         </div>
       </div>
-    </>
+
+      {tab === 'records' ? (
+        <>
+          <div data-tutorial="admin-filter">
+          <FilterPanel
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            selectedDateEnd={selectedDateEnd}
+            setSelectedDateEnd={setSelectedDateEnd}
+            todayCount={todayRecords.length}
+            allCount={records.length}
+            machines={machines}
+            filters={filters}
+            setFilters={setFilters}
+            resultCount={filteredRecords.length}
+            baseCount={baseRecords.length}
+          />
+          </div>
+          {/* Selection bar */}
+          {!readOnly && selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-3 bg-yellow-400/10 border border-yellow-400/30
+                            rounded-2xl flex-wrap">
+              <span className="text-yellow-300 font-semibold text-sm">
+                เลือก {selectedIds.size} รายการ
+              </span>
+              <span className="text-yellow-400/70 text-sm font-mono">
+                · หนี้รวม ฿{filteredRecords.filter(r => selectedIds.has(r.id)).reduce((s, r) => s + r.debt, 0).toLocaleString()}
+              </span>
+              <div className="flex gap-2 ml-auto">
+                <button onClick={clearSelection}
+                  className="h-8 px-3 rounded-lg bg-panel border border-border text-muted
+                             hover:text-light text-sm transition-all">
+                  ยกเลิก
+                </button>
+                <button onClick={() => setShowBulkPay(true)}
+                  className="h-8 px-4 rounded-lg bg-yellow-400 text-black font-semibold
+                             hover:bg-yellow-300 text-sm transition-all">
+                  💳 จ่ายรวม
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div data-tutorial="admin-table">
+          <RecordsTable
+            records={filteredRecords}
+            onDelete={deleteRecord}
+            deleting={deleting}
+            onPay={setPayingRecord}
+            selectedIds={selectedIds}
+            debtIds={debtIds}
+            onToggle={toggleSelect}
+            onToggleAll={toggleSelectAll}
+            readOnly={readOnly}
+          />
+          </div>
+        </>
+      ) : (
+        <UsersTable users={users} onDelete={deleteUser} deleting={deleting} currentUserId={currentUserId} />
+      )}
+
+      {!readOnly && <DataManagementCard totalRecords={records.length} />}
+
+      {!readOnly && showAddUser && (
+        <AddUserDialog
+          onClose={() => setShowAddUser(false)}
+          onCreated={(u) => { setUsers(us => [...us, u]); setShowAddUser(false); router.refresh() }}
+        />
+      )}
+
+      {!readOnly && payingRecord && (
+        <PayDialog
+          record={payingRecord}
+          onClose={() => setPayingRecord(null)}
+          onConfirm={(cash, coupon) => payRecord(payingRecord.id, cash, coupon)}
+        />
+      )}
+
+      {!readOnly && showBulkPay && (
+        <BulkPayDialog
+          records={filteredRecords.filter(r => selectedIds.has(r.id))}
+          onClose={() => setShowBulkPay(false)}
+          onConfirm={bulkPayRecords}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ===== sub-components ===== */
+
+function Stat({ label, value, sub, danger }: { label: string; value: string; sub?: string; danger?: boolean }) {
+  return (
+    <div className="stat-card">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</div>
+      <div className={['font-mono tabular-nums text-4xl font-bold leading-tight',
+                       danger ? 'text-accent2' : ''].join(' ')}>{value}</div>
+      {sub && <div className="text-xs text-muted">{sub}</div>}
+    </div>
+  )
+}
+
+function RecordsTable({ records, onDelete, deleting, onPay,
+                        selectedIds, debtIds, onToggle, onToggleAll, readOnly }: {
+  records: RecordRow[]
+  onDelete: (id: string) => void
+  deleting: string | null
+  onPay: (r: RecordRow) => void
+  selectedIds: Set<string>
+  debtIds: string[]
+  onToggle: (id: string) => void
+  onToggleAll: () => void
+  readOnly?: boolean
+}) {
+  if (records.length === 0) {
+    return <div className="card text-center py-12 text-muted text-sm">ไม่พบรายการที่ตรงกับตัวกรอง</div>
+  }
+
+  const visibleDebtIds = records.filter(r => r.debt > 0).map(r => r.id)
+  const allSelected = visibleDebtIds.length > 0 && visibleDebtIds.every(id => selectedIds.has(id))
+  const someSelected = visibleDebtIds.some(id => selectedIds.has(id))
+
+  return (
+    <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-panel">
+              {/* select-all checkbox — admin only */}
+              {!readOnly && (
+                <th className="pl-4 pr-2 py-3 w-8">
+                  {visibleDebtIds.length > 0 && (
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={el => { if (el) el.indeterminate = someSelected && !allSelected }}
+                      onChange={onToggleAll}
+                      className="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
+                      title="เลือก/ยกเลิกทั้งหมด"
+                    />
+                  )}
+                </th>
+              )}
+              {['เลขที่','เครื่อง','ยืม','คืน','นาที','บาท','คูปอง','หนี้','ทอน','หมายเหตุ',
+                 ...(!readOnly ? ['',''] : [])].map((h, i) => (
+                <th key={i}
+                    className="px-4 py-3 text-left text-[11px] font-semibold text-muted
+                               uppercase tracking-[0.08em] whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {records.map(r => {
+              const isSelected = selectedIds.has(r.id)
+              return (
+                <tr key={r.id}
+                    className={['table-row', isSelected ? 'bg-yellow-400/5' : ''].join(' ')}>
+                  {/* checkbox cell — admin only */}
+                  {!readOnly && (
+                    <td className="pl-4 pr-2 py-3">
+                      {r.debt > 0 && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => onToggle(r.id)}
+                          className="w-4 h-4 rounded accent-yellow-400 cursor-pointer"
+                        />
+                      )}
+                    </td>
+                  )}
+                  <td className="px-4 py-3 font-mono text-accent font-semibold">#{r.number}</td>
+                  <td className="px-4 py-3"><span className="pill pill-idle font-mono">{r.machine}</span></td>
+                  <td className="px-4 py-3 font-mono leading-tight">
+                    <div>{r.borrowAt}</div>
+                    <div className="text-[10px] text-muted font-sans">{fmtDateTH(new Date(r.createdAt))}</div>
+                  </td>
+                  <td className="px-4 py-3 font-mono leading-tight">
+                    {r.returnAt
+                      ? <><div>{r.returnAt}</div><div className="text-[10px] text-muted font-sans">{fmtDateTH(new Date(r.createdAt))}</div></>
+                      : <span className="text-muted">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">{r.minutes}</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold">฿{r.baht}</td>
+                  <td className="px-4 py-3 text-right font-mono">{r.coupon ? `฿${r.coupon}` : '—'}</td>
+                  <td className="px-4 py-3 text-right font-mono text-accent2">{r.debt ? `฿${r.debt}` : '—'}</td>
+                  <td className="px-4 py-3 text-right font-mono text-green-500">{r.change ? `฿${r.change}` : '—'}</td>
+                  <td className="px-4 py-3 text-muted text-xs max-w-[200px] truncate">{r.reports || '—'}</td>
+                  {!readOnly && (
+                    <>
+                      <td className="px-4 py-3">
+                        {r.debt > 0 && (
+                          <button
+                            onClick={() => onPay(r)}
+                            title="จ่ายย้อนหลัง (รายการเดียว)"
+                            className="w-8 h-8 rounded-lg bg-yellow-400/10 border border-yellow-400/30
+                                       text-yellow-400 hover:bg-yellow-400/20 grid place-items-center"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                              <rect x="2" y="6" width="20" height="13" rx="2"/>
+                              <path d="M2 10h20"/><path d="M7 15h2m4 0h2"/>
+                            </svg>
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => onDelete(r.id)}
+                          disabled={deleting === r.id}
+                          className="w-8 h-8 rounded-lg bg-accent2/10 border border-accent2/20
+                                     text-accent2 hover:bg-accent2/20 grid place-items-center"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                               stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M3 6h18"/>
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/>
+                          </svg>
+                        </button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function UsersTable({ users, onDelete, deleting, currentUserId }: {
+  users: UserRow[]
+  onDelete: (id: string) => void
+  deleting: string | null
+  currentUserId: string
+}) {
+  return (
+    <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-panel">
+            {['Username','Role','สร้างเมื่อ',''].map(h => (
+              <th key={h}
+                  className="px-4 py-3 text-left text-[11px] font-semibold text-muted
+                             uppercase tracking-[0.08em] whitespace-nowrap">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {users.map(u => (
+            <tr key={u.id} className="table-row">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className={[
+                    'w-9 h-9 rounded-full grid place-items-center font-semibold text-sm',
+                    u.role === 'admin' ? 'bg-accent text-accent-ink' : 'bg-panel text-light',
+                  ].join(' ')}>
+                    {u.username[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-semibold">{u.username}</div>
+                    <div className="text-xs text-muted font-mono">{u.id.slice(0, 8)}</div>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <span className={`pill ${u.role === 'admin' ? 'pill-active' : 'pill-idle'}`}>
+                  {u.role}
+                </span>
+              </td>
+              <td className="px-4 py-3 font-mono text-xs text-muted">
+                {new Date(u.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+              </td>
+              <td className="px-4 py-3">
+                <button
+                  onClick={() => onDelete(u.id)}
+                  disabled={u.id === currentUserId || deleting === u.id}
+                  className="w-8 h-8 rounded-lg bg-accent2/10 border border-accent2/20
+                             text-accent2 hover:bg-accent2/20 grid place-items-center
+                             disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={u.id === currentUserId ? 'ลบตัวเองไม่ได้' : 'ลบ'}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6" />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PayDialog({ record, onClose, onConfirm }: {
+  record: RecordRow
+  onClose: () => void
+  onConfirm: (cash: number, coupon: number) => void
+}) {
+  const [cash,   setCash]   = useState('')
+  const [coupon, setCoupon] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const cashNum   = parseInt(cash)   || 0
+  const couponNum = parseInt(coupon) || 0
+  const totalPaid = cashNum + couponNum
+  const newDebt   = Math.max(0, record.debt - totalPaid)
+  const newChange = Math.max(0, totalPaid - record.debt)
+  const canSubmit = totalPaid > 0
+
+  async function submit() {
+    if (!canSubmit) return
+    setLoading(true)
+    await onConfirm(cashNum, couponNum)
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 backdrop-blur-sm p-4"
+         onClick={onClose}>
+      <div className="bg-surface border border-border rounded-3xl w-full max-w-md shadow-pop"
+           onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <div className="font-display text-xl font-semibold">จ่ายย้อนหลัง</div>
+            <div className="text-xs text-muted mt-0.5">
+              #{record.number} · {record.machine} · {fmtDateTH(new Date(record.createdAt))}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] text-muted uppercase tracking-wide">หนี้คงเหลือ</div>
+            <div className="font-mono text-2xl font-bold text-accent2">฿{record.debt}</div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-6 space-y-4">
+          <div>
+            <label className="label">💵 เงินสดที่จ่าย (บาท)</label>
+            <input
+              className="input-field"
+              type="number"
+              min="0"
+              placeholder="0"
+              value={cash}
+              onChange={e => setCash(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">🎟 คูปองที่จ่าย (บาท)</label>
+            <input
+              className="input-field"
+              type="number"
+              min="0"
+              placeholder="0"
+              value={coupon}
+              onChange={e => setCoupon(e.target.value)}
+            />
+          </div>
+
+          {/* Preview */}
+          {totalPaid > 0 && (
+            <div className="bg-panel border border-border rounded-xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted">ยอดที่จ่าย</span>
+                <span className="font-mono font-semibold text-light">฿{totalPaid}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">หนี้คงเหลือหลังจ่าย</span>
+                <span className={`font-mono font-semibold ${newDebt === 0 ? 'text-green-400' : 'text-accent2'}`}>
+                  ฿{newDebt}
+                </span>
+              </div>
+              {newChange > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted">ทอนเงิน</span>
+                  <span className="font-mono font-semibold text-green-400">฿{newChange}</span>
+                </div>
+              )}
+              {newDebt === 0 && (
+                <div className="text-center text-xs text-green-400 font-semibold pt-1">
+                  ✓ ชำระครบแล้ว
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-border flex gap-3 justify-end">
+          <button onClick={onClose} className="btn-secondary">ยกเลิก</button>
+          <button
+            onClick={submit}
+            disabled={!canSubmit || loading}
+            className="btn-primary disabled:opacity-40"
+          >
+            {loading ? 'กำลังบันทึก…' : 'บันทึกการชำระ'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Distribution helper ─────────────────────────────────────────── */
+function distributePayment(
+  records: RecordRow[],
+  cashPaid: number,
+  couponPaid: number,
+): BulkPayResult[] {
+  let remCash   = cashPaid
+  let remCoupon = couponPaid
+  const results: BulkPayResult[] = records.map(r => {
+    const couponFor = Math.min(remCoupon, r.debt)
+    remCoupon -= couponFor
+    const cashFor = Math.min(remCash, r.debt - couponFor)
+    remCash -= cashFor
+    return {
+      id: r.id,
+      newDebt:   r.debt - couponFor - cashFor,
+      newCoupon: r.coupon + couponFor,
+      newChange: 0,
+    }
+  })
+  // ทอนส่วนเกินให้รายการสุดท้ายที่จ่ายครบ
+  const overpay = remCash + remCoupon
+  if (overpay > 0) {
+    const lastFull = [...results].reverse().find(x => x.newDebt === 0)
+    if (lastFull) lastFull.newChange = overpay
+  }
+  return results
+}
+
+function BulkPayDialog({ records, onClose, onConfirm }: {
+  records: RecordRow[]
+  onClose: () => void
+  onConfirm: (results: BulkPayResult[]) => Promise<void>
+}) {
+  const [cash,    setCash]    = useState('')
+  const [coupon,  setCoupon]  = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const cashNum   = parseInt(cash)   || 0
+  const couponNum = parseInt(coupon) || 0
+  const totalDebt = records.reduce((s, r) => s + r.debt, 0)
+  const totalPaid = cashNum + couponNum
+  const preview   = totalPaid > 0 ? distributePayment(records, cashNum, couponNum) : null
+  const newTotalDebt = preview ? preview.reduce((s, r) => s + r.newDebt, 0) : totalDebt
+  const totalChange  = preview ? preview.reduce((s, r) => s + r.newChange, 0) : 0
+  const paidFull     = preview ? preview.filter(r => r.newDebt === 0).length : 0
+
+  async function submit() {
+    if (!preview || totalPaid === 0) return
+    setLoading(true)
+    await onConfirm(preview)
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 backdrop-blur-sm p-4"
+         onClick={onClose}>
+      <div className="bg-surface border border-border rounded-3xl w-full max-w-lg shadow-pop
+                      max-h-[90vh] overflow-y-auto"
+           onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
+          <div>
+            <div className="font-display text-xl font-semibold">จ่ายรวม {records.length} รายการ</div>
+            <div className="text-xs text-muted mt-0.5">กระจายจ่าย: คูปองก่อน → เงินสด ตามลำดับรายการ</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] text-muted uppercase tracking-wide">หนี้รวม</div>
+            <div className="font-mono text-2xl font-bold text-accent2">฿{totalDebt.toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/* Inputs */}
+        <div className="px-6 pt-5 pb-4 grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">💵 เงินสดรวม (บาท)</label>
+            <input className="input-field" type="number" min="0" placeholder="0"
+                   value={cash} onChange={e => setCash(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className="label">🎟 คูปองรวม (บาท)</label>
+            <input className="input-field" type="number" min="0" placeholder="0"
+                   value={coupon} onChange={e => setCoupon(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Summary preview */}
+        {preview && (
+          <div className="mx-6 mb-4 bg-panel border border-border rounded-xl p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">ยอดจ่ายรวม</span>
+              <span className="font-mono font-semibold text-light">฿{totalPaid.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">ชำระครบแล้ว</span>
+              <span className="font-mono font-semibold text-green-400">{paidFull} / {records.length} รายการ</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">หนี้คงเหลือรวม</span>
+              <span className={`font-mono font-semibold ${newTotalDebt === 0 ? 'text-green-400' : 'text-accent2'}`}>
+                ฿{newTotalDebt.toLocaleString()}
+              </span>
+            </div>
+            {totalChange > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted">ทอนเงินรวม</span>
+                <span className="font-mono font-semibold text-green-400">฿{totalChange.toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Per-record breakdown */}
+        <div className="px-6 pb-5 space-y-2">
+          <div className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-3">
+            รายละเอียดแต่ละรายการ
+          </div>
+          {records.map((r, i) => {
+            const p = preview?.[i]
+            return (
+              <div key={r.id}
+                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm
+                               ${p?.newDebt === 0 ? 'border-green-500/30 bg-green-500/5' : 'border-border bg-panel'}`}>
+                <span className="font-mono text-accent font-semibold w-10 shrink-0">#{r.number}</span>
+                <span className="pill pill-idle font-mono text-xs shrink-0">{r.machine}</span>
+                <span className="text-muted text-xs shrink-0">{fmtDateTH(new Date(r.createdAt))}</span>
+                <div className="ml-auto flex items-center gap-3 shrink-0">
+                  <span className="font-mono text-accent2 text-xs">฿{r.debt}</span>
+                  {p && (
+                    <>
+                      <span className="text-muted text-xs">→</span>
+                      <span className={`font-mono font-semibold text-xs
+                                       ${p.newDebt === 0 ? 'text-green-400' : 'text-accent2'}`}>
+                        ฿{p.newDebt}
+                      </span>
+                      {p.newDebt === 0 && <span className="text-green-400 text-xs">✓</span>}
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-border flex gap-3 justify-end sticky bottom-0 bg-surface">
+          <button onClick={onClose} className="btn-secondary">ยกเลิก</button>
+          <button
+            onClick={submit}
+            disabled={totalPaid === 0 || loading}
+            className="btn-primary disabled:opacity-40"
+          >
+            {loading ? 'กำลังบันทึก…' : `บันทึก ${records.length} รายการ`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AddUserDialog({ onClose, onCreated }: {
+  onClose: () => void
+  onCreated: (u: UserRow) => void
+}) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole]         = useState<'staff' | 'admin'>('staff')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+
+  async function submit() {
+    if (!username || !password) return setError('กรอกข้อมูลให้ครบ')
+    setLoading(true)
+    try {
+      // Reuse register endpoint if present, else mimic locally
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'เพิ่มผู้ใช้ไม่สำเร็จ')
+        return
+      }
+      const data = await res.json()
+      onCreated(data)
+    } catch {
+      setError('เกิดข้อผิดพลาด')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 backdrop-blur-sm p-4"
+         onClick={onClose}>
+      <div className="bg-surface border border-border rounded-3xl w-full max-w-md shadow-pop"
+           onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-border">
+          <div className="font-display text-xl font-semibold">เพิ่มผู้ใช้ใหม่</div>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <div>
+            <label className="label">Username</label>
+            <input className="input-field" value={username} onChange={e => setUsername(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Password</label>
+            <input className="input-field" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Role</label>
+            <div className="bg-surface border border-border rounded-xl p-1 flex gap-1">
+              {(['staff', 'admin'] as const).map(r => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={[
+                    'flex-1 h-9 rounded-lg text-sm font-medium transition-all',
+                    role === r ? 'bg-light text-ink' : 'text-muted hover:text-light',
+                  ].join(' ')}
+                >{r}</button>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-sm text-accent2">{error}</p>}
+        </div>
+        <div className="px-6 py-4 border-t border-border flex gap-3 justify-end">
+          <button onClick={onClose} className="btn-secondary">ยกเลิก</button>
+          <button onClick={submit} disabled={loading} className="btn-primary">
+            {loading ? 'กำลังบันทึก…' : 'เพิ่มผู้ใช้'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

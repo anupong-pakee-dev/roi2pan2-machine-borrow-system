@@ -8,19 +8,28 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-body)', 'sans-serif'],
-        display: ['var(--font-display)', 'serif'],
-        mono: ['var(--font-mono)', 'monospace'],
+        sans:    ['var(--font-body)',    'sans-serif'],
+        display: ['var(--font-display)', 'sans-serif'],
+        mono:    ['var(--font-mono)',    'monospace'],
       },
       colors: {
-        ink: '#0f1117',
-        surface: '#1a1d27',
-        panel: '#222536',
-        border: '#2e3248',
-        accent: '#f5a623',
-        accent2: '#e85d75',
-        muted: '#6b7280',
-        light: '#e8e9f0',
+        // Semantic colors driven by CSS variables (theme-aware)
+        ink:        'var(--c-ink)',         // page background
+        surface:    'var(--c-surface)',     // card background
+        panel:      'rgb(var(--c-panel-rgb) / <alpha-value>)',    // elevated panel
+        border:     'var(--c-border)',
+        light:      'rgb(var(--c-light-rgb) / <alpha-value>)',  // primary text
+        muted:      'var(--c-muted)',       // secondary text
+        accent:     'var(--c-accent)',      // primary accent (acid lime)
+        'accent-ink': 'var(--c-accent-ink)',// readable color ON accent
+        accent2:    'rgb(var(--c-accent2-rgb) / <alpha-value>)', // danger
+      },
+      boxShadow: {
+        'card':  '0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04)',
+        'pop':   '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)',
+      },
+      borderRadius: {
+        '4xl': '1.75rem',
       },
     },
   },

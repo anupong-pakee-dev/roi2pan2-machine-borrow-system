@@ -12,7 +12,7 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // อนุญาตทั้ง admin และ user ให้ลบได้
-  if (!session.role || !['admin', 'user'].includes(session.role)) {
+  if (!session.role || !['admin', 'staff'].includes(session.role)) {
     return NextResponse.json({ error: 'ไม่มีสิทธิ์ลบข้อมูล' }, { status: 403 })
   }
 

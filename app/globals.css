@@ -1,113 +1,164 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-display: 'Syne', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'IBM Plex Sans Thai', sans-serif;
+  --font-body:    'IBM Plex Sans Thai', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
 }
 
-* {
-  box-sizing: border-box;
+/* ---------- Dark (default) ---------- */
+:root, .theme-dark {
+  --c-ink:         #0A0C10;
+  --c-surface:     #14171F;
+  --c-panel:       #1B1E28;
+  --c-panel-rgb:   27 30 40;
+  --c-border:      rgba(255, 255, 255, 0.08);
+  --c-light:       #F3F1EA;
+  --c-light-rgb:   243 241 234;
+  --c-muted:       #7C8090;
+  --c-accent:      #C4FF3E;
+  --c-accent-ink:  #0C0E12;
+  --c-accent2:     #FF6B65;
+  --c-accent2-rgb: 255 107 101;
 }
 
-html {
-  scroll-behavior: smooth;
+/* ---------- Light ---------- */
+.theme-light {
+  --c-ink:         #F5F2EA;
+  --c-surface:     #FFFFFF;
+  --c-panel:       #FAF7EE;
+  --c-panel-rgb:   250 247 238;
+  --c-border:      rgba(12, 14, 18, 0.10);
+  --c-light:       #0C0E12;
+  --c-light-rgb:   12 14 18;
+  --c-muted:       #6B6E78;
+  --c-accent:      #C4FF3E;
+  --c-accent-ink:  #0C0E12;
+  --c-accent2:     #D9342B;
+  --c-accent2-rgb: 217 52 43;
 }
 
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
-  background-color: #0f1117;
-  color: #e8e9f0;
+  background-color: var(--c-ink);
+  color: var(--c-light);
   font-family: var(--font-body);
   min-height: 100vh;
+  font-variant-numeric: normal;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #1a1d27; }
-::-webkit-scrollbar-thumb { background: #2e3248; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #f5a623; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-muted); }
 
-/* Input focus ring */
-input:focus, select:focus, textarea:focus {
-  outline: none;
-}
+::selection { background: var(--c-accent); color: var(--c-accent-ink); }
 
-/* Number input arrows hide */
+input:focus, select:focus, textarea:focus { outline: none; }
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+  -webkit-appearance: none; margin: 0;
 }
+
+.tabular { font-variant-numeric: tabular-nums; }
+.font-mono { font-variant-numeric: tabular-nums; }
 
 @layer components {
-  .card {
-    @apply bg-surface border border-border rounded-2xl p-6;
-  }
-
+  /* ── Buttons ───────────────────────────────── */
   .btn-primary {
-    @apply bg-accent text-ink font-semibold px-5 py-2.5 rounded-xl
-           hover:bg-amber-400 active:scale-95 transition-all duration-150
+    @apply inline-flex items-center justify-center gap-2
+           bg-accent text-accent-ink font-semibold
+           px-4 h-9 text-sm rounded-xl
+           sm:px-5 sm:h-11 sm:text-base
+           hover:brightness-95 active:scale-[.985]
+           transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
-
   .btn-secondary {
-    @apply bg-panel border border-border text-light font-medium px-5 py-2.5 rounded-xl
-           hover:border-accent hover:text-accent active:scale-95 transition-all duration-150;
+    @apply inline-flex items-center justify-center gap-2
+           bg-surface border border-border text-light font-medium
+           px-4 h-9 text-sm rounded-xl
+           sm:px-5 sm:h-11 sm:text-base
+           hover:bg-panel active:scale-[.985]
+           transition-all duration-150;
   }
-
   .btn-danger {
-    @apply bg-accent2/10 border border-accent2/30 text-accent2 font-medium px-5 py-2.5 rounded-xl
-           hover:bg-accent2/20 active:scale-95 transition-all duration-150;
+    @apply inline-flex items-center justify-center gap-2
+           bg-accent2/10 border border-accent2/30 text-accent2 font-medium
+           px-4 h-9 text-sm rounded-xl
+           sm:px-5 sm:h-11 sm:text-base
+           hover:bg-accent2/20 active:scale-[.985]
+           transition-all duration-150;
   }
+  .btn-lg { @apply h-11 text-base px-5 sm:h-14 sm:text-lg sm:px-6; }
 
+  /* ── Inputs ────────────────────────────────── */
   .input-field {
-    @apply w-full bg-panel border border-border text-light placeholder-muted
-           rounded-xl px-4 py-3 text-sm
-           focus:border-accent focus:ring-1 focus:ring-accent/30
+    @apply w-full bg-surface border border-border text-light placeholder:text-muted
+           rounded-xl px-3 h-10 text-sm
+           sm:px-4 sm:h-11 sm:text-base
+           focus:border-light focus:ring-4 focus:ring-light/10
            transition-colors duration-150;
   }
+  textarea.input-field { @apply py-2.5 h-auto sm:py-3; }
 
   .label {
-    @apply block text-xs font-medium text-muted uppercase tracking-widest mb-1.5;
+    @apply block text-[11px] font-semibold text-muted uppercase tracking-[0.08em] mb-1.5;
   }
 
-  .badge {
-    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+  /* ── Cards / Surfaces ──────────────────────── */
+  .card {
+    @apply bg-surface border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6;
   }
-
-  .badge-admin {
-    @apply badge bg-accent/15 text-accent border border-accent/30;
-  }
-
-  .badge-user {
-    @apply badge bg-blue-500/15 text-blue-400 border border-blue-500/30;
-  }
-
   .stat-card {
-    @apply card flex flex-col gap-1;
+    @apply bg-surface border border-border rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-col gap-0.5 sm:gap-1;
+  }
+  .stat-card-accent {
+    @apply bg-light text-ink border-transparent;
   }
 
+  /* ── Pills / Chips ─────────────────────────── */
+  .pill {
+    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-full
+           text-xs font-semibold uppercase tracking-[0.06em]
+           bg-panel text-light;
+  }
+  .pill-idle    { @apply bg-panel text-muted; }
+  .pill-active  { @apply bg-accent text-accent-ink; }
+  .pill-warn    { @apply bg-yellow-500/15 text-yellow-500; }
+  .pill-danger  { @apply bg-accent2/15 text-accent2; }
+  .pill-success { @apply bg-green-500/15 text-green-500; }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full
+           text-[13px] font-medium
+           bg-surface border border-border text-light
+           hover:border-light/40
+           transition-all duration-150 cursor-pointer;
+  }
+  .chip.active        { @apply bg-light text-ink border-light; }
+  .chip.active-cash   { @apply bg-green-500 text-white  border-green-500; }
+  .chip.active-coupon { @apply bg-yellow-500 text-black border-yellow-500; }
+  .chip.active-debt   { @apply bg-accent2  text-white  border-accent2; }
+
+  /* ── Tables ────────────────────────────────── */
   .table-row {
-    @apply border-b border-border hover:bg-white/[0.02] transition-colors duration-100;
+    @apply border-b border-border hover:bg-panel/60 transition-colors duration-100;
   }
 }
 
-/* ── Mobile overrides ───────────────────────── */
-@media (max-width: 390px) {
-  .input-field {
-    @apply px-3 py-2.5 text-sm;
-  }
-  .btn-primary, .btn-secondary, .btn-danger {
-    @apply px-3 py-2 text-sm;
-  }
-  .label {
-    @apply text-[10px] mb-1;
-  }
-  .card {
-    @apply p-4 rounded-xl;
-  }
+/* Numeric-tabular utility for any element */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Small-screen tweaks */
+@media (max-width: 480px) {
+  .card { @apply p-4 rounded-xl; }
+  .stat-card { @apply p-4; }
 }
