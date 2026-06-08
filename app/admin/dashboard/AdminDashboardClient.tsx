@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import FilterPanel, { FilterState } from '@/components/FilterPanel'
 import DataManagementCard from './DataManagementCard'
+import RankingCard from './RankingCard'
 import { toISODate, fmtDateTH } from '@/lib/format'
 import TutorialOverlay, { TutorialHelpButton, TutorialStep, useTutorial } from '@/components/Tutorial'
 
@@ -394,6 +395,8 @@ export default function AdminDashboardClient({ records: initialRecords, users: i
       ) : (
         <UsersTable users={users} onDelete={deleteUser} deleting={deleting} currentUserId={currentUserId} />
       )}
+
+      <RankingCard records={records} />
 
       {!readOnly && <DataManagementCard totalRecords={records.length} />}
 
