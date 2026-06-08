@@ -12,12 +12,20 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const body = await req.json()
-    // Require confirmation phrase
     if (body.confirm !== 'ยืนยันลบข้อมูลทั้งหมด') {
       return NextResponse.json({ error: 'รหัสยืนยันไม่ถูกต้อง' }, { status: 400 })
     }
 
-    const { count } = await prisma.record.deleteMany({})
+    const { from, to } = body
+    const where: { createdAt?: { gte?: Date; lte?: Date } } = {}
+    if (from) {
+      where.createdAt = { ...where.createdAt, gte: new Date(from + 'T00:00:00+07:00') }
+    }
+    if (to) {
+      where.createdAt = { ...where.createdAt, lte: new Date(to + 'T23:59:59+07:00') }
+    }
+
+    const { count } = await prisma.record.deleteMany({ where })
     return NextResponse.json({ deleted: count })
   } catch (err) {
     console.error(err)

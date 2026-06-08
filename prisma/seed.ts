@@ -26,7 +26,7 @@ async function main() {
     create: {
       username: 'staff',
       password: staffPassword,
-      role: 'user',
+      role: 'staff',
     },
   })
 

@@ -1,179 +1,125 @@
-# MachineLog — ระบบบันทึกการยืม-คืนเครื่อง
+# MachineLog — Redesign Port (Next.js 14 + Tailwind)
 
-ระบบ web application สำหรับบันทึกการยืม-คืนเครื่อง พร้อม Dashboard และระบบ Admin
-
----
-
-## Tech Stack
-
-| Layer      | Technology                     |
-|------------|-------------------------------|
-| Framework  | Next.js 14 (App Router)        |
-| Database   | PostgreSQL                    |
-| ORM        | Prisma 5                      |
-| Styling    | Tailwind CSS                  |
-| Auth       | JWT (jose) + HTTP-only Cookie |
-| Language   | TypeScript                    |
+ดีไซน์ใหม่แบบ **POS สำหรับร้านเกม** พร้อม Dark/Light theme + Filter system ครบ
+แปลงให้ใช้กับ codebase เดิม (`anupong-pakee-dev/roi2pan2-machine-borrow-system`) ได้ทันที
 
 ---
 
-## หน้าเว็บ
+## What's New
 
-| Path                  | คำอธิบาย                                 | Role       |
-|-----------------------|------------------------------------------|------------|
-| `/login`              | หน้าเข้าสู่ระบบ                          | ทุกคน     |
-| `/dashboard`          | Dashboard แสดงรายการล่าสุด + สถิติ       | User/Admin |
-| `/form`               | ฟอร์มบันทึกการยืม-คืนเครื่อง            | User/Admin |
-| `/admin/dashboard`    | Admin panel: จัดการ User, ดูทุก Record  | Admin only |
+### Visual
+- 🎨 **POS-style Machine Grid** — แตะเครื่องว่าง = ยืม, แตะเครื่องที่ใช้อยู่ = คืน
+- 🌗 **Dark / Light theme** — สลับด้วย ToggleButton บน Navbar (เก็บใน localStorage)
+- 🔤 **IBM Plex Sans Thai + IBM Plex Mono** — POS feel, ตัวเลขตรงกริด
+- 🟢 **Acid lime accent** (`#C4FF3E`) แทนสีส้มเดิม
 
-**ทุกหน้ามี Footer และ Navbar**
+### UX
+- ⚡ **Quick Borrow / Quick Return modals** — ทำงานครบใน 2 คลิก
+- 🔍 **Filter Panel** ที่ Admin Dashboard:
+  - ช่วงเวลา: วันนี้ / เลือกวัน (date picker) / ทั้งหมด
+  - ค้นหา: เลขที่ / เครื่อง / หมายเหตุ (debounced)
+  - Machine chips
+  - วิธีชำระ: เงินสด / คูปอง / ค้างชำระ
+  - Result count + clear-all
+- 📊 **Stats cards** เปลี่ยนตาม filter
 
----
-
-## Database Schema
-
-### `Record`
-| Field      | Type     | Description                           |
-|------------|----------|---------------------------------------|
-| id         | String   | UUID (auto)                           |
-| number     | Int      | เลขที่ เช่น 232                      |
-| machine    | String   | ชื่อเครื่อง เช่น S10                 |
-| borrowAt   | String   | เวลายืม รูปแบบ "HH.MM" เช่น 14.30   |
-| returnAt   | String   | เวลาคืน รูปแบบ "HH.MM" เช่น 18.20   |
-| minutes    | Int      | คำนวณอัตโนมัติจากระยะห่างเวลา        |
-| baht       | Int      | = minutes (นาทีละ 1 บาท)             |
-| coupon     | Int      | คูปองที่ใช้ (บาท)                    |
-| debt       | Int      | หนี้ = max(0, baht - coupon)         |
-| change     | Int      | เงินทอน = max(0, coupon - baht)      |
-| reports    | String?  | หมายเหตุ (optional)                  |
-| createdAt  | DateTime | auto                                  |
-| updatedAt  | DateTime | auto                                  |
-
-### `User`
-| Field      | Type     | Description           |
-|------------|----------|-----------------------|
-| id         | String   | UUID (auto)           |
-| username   | String   | Unique                |
-| password   | String   | bcrypt hashed         |
-| role       | String   | "admin" หรือ "user"  |
-| createdAt  | DateTime | auto                  |
-| updatedAt  | DateTime | auto                  |
+### Technical
+- **CSS variables ใน `globals.css`** — `.theme-dark` / `.theme-light`
+- **Tailwind colors** อ้าง CSS vars → token names เดิม (`bg-surface`, `text-light` ฯลฯ) ยังใช้ได้
+- **Hot paths แยกไฟล์** — `<MachineTile>`, `<QuickBorrowModal>`, `<QuickReturnModal>`, `<FilterPanel>`, `<ClockBadge>`, `<ThemeToggle>`, `<ModalShell>`
+- API contracts (POST `/api/records`, PATCH `/api/records/:id`, DELETE ฯลฯ) **เหมือนเดิม** — ไม่ต้องแก้ backend / Prisma schema
 
 ---
 
-## ติดตั้งและใช้งาน
+## File Tree (ส่วนที่เปลี่ยน)
 
-### ความต้องการ
-- Node.js 18+
-- PostgreSQL 14+
+```
+app/
+├── globals.css                  ← เขียนใหม่ (CSS vars, theme switch)
+├── layout.tsx                   ← เพิ่ม class="theme-dark" บน <html>
+├── login/
+│   ├── page.tsx                 ← split hero/form layout
+│   └── LoginForm.tsx            ← เขียนใหม่ + ปุ่ม "กรอกให้"
+├── dashboard/
+│   ├── page.tsx                 ← เดิม (server-side fetch)
+│   └── DashboardClient.tsx      ← เขียนใหม่ — Machine Grid
+├── form/
+│   ├── page.tsx                 ← เดิม
+│   └── RecordForm.tsx           ← เขียนใหม่ — POS picker
+├── return/
+│   ├── page.tsx                 ← เดิม
+│   └── ReturnForm.tsx           ← เขียนใหม่ — coupon presets + calc
+└── admin/dashboard/
+    ├── page.tsx                 ← เดิม
+    └── AdminDashboardClient.tsx ← เขียนใหม่ — Filter Panel
 
-### 1. Clone & ติดตั้ง
+components/
+├── Navbar.tsx                   ← เขียนใหม่ + clock + theme toggle
+├── Footer.tsx                   ← minor
+├── ClockBadge.tsx               ← ใหม่
+├── ThemeToggle.tsx              ← ใหม่
+├── MachineTile.tsx              ← ใหม่
+├── ModalShell.tsx               ← ใหม่
+├── QuickBorrowModal.tsx         ← ใหม่
+├── QuickReturnModal.tsx         ← ใหม่
+└── FilterPanel.tsx              ← ใหม่
 
-```bash
-cd machine-borrow
-npm install
+lib/
+└── format.ts                    ← ใหม่ (time / date helpers)
+
+tailwind.config.js               ← ขยาย token + CSS vars
 ```
 
-### 2. ตั้งค่า Database
-
-แก้ไขไฟล์ `.env`:
-
-```env
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/machine_borrow"
-JWT_SECRET="your-super-secret-key"
-```
-
-### 3. สร้างฐานข้อมูล
-
-```bash
-# สร้าง database ก่อน (ใน psql)
-createdb machine_borrow
-
-# Push schema
-npm run db:push
-
-# Seed ข้อมูลตัวอย่าง
-npm run db:seed
-```
-
-### 4. รัน Dev Server
-
-```bash
-npm run dev
-```
-
-เปิด → **http://localhost:3000**
+ไฟล์ที่ **ไม่ต้องแก้:**
+- API routes ทั้งหมดใน `app/api/`
+- `prisma/schema.prisma`, `lib/prisma.ts`, `lib/auth.ts`
+- `middleware.ts`
 
 ---
 
-## บัญชีผู้ใช้เริ่มต้น
+## วิธีนำไป Apply
 
-| Username | Password   | Role  |
-|----------|-----------|-------|
-| admin    | admin1234 | admin |
-| user     | user1234  | user  |
+1. Clone repo เดิม
+2. Copy ทุกไฟล์ใน folder `nextjs/` นี้ทับลงไปใน repo (กลายเป็น root)
+3. `npm install` (ไม่มี dependency เพิ่ม)
+4. `npm run dev`
 
----
-
-## API Routes
-
-| Method | Path                      | Description              | Auth         |
-|--------|---------------------------|--------------------------|--------------|
-| POST   | `/api/auth/login`         | เข้าสู่ระบบ             | Public       |
-| POST   | `/api/auth/logout`        | ออกจากระบบ              | Authenticated|
-| GET    | `/api/records`            | ดึงรายการทั้งหมด         | Authenticated|
-| POST   | `/api/records`            | สร้างรายการใหม่          | Authenticated|
-| DELETE | `/api/admin/users/:id`    | ลบผู้ใช้                | Admin only   |
+### หมายเหตุ — มี `/api/admin/users` (POST) ไหม?
+ในส่วน Admin > Add User เรียก `POST /api/admin/users` — ถ้า repo ยังไม่มี route นี้ ให้เพิ่ม
+หรือลบฟังก์ชัน Add User ออกจาก `AdminDashboardClient.tsx` ก็ได้ (ส่วนอื่นทำงานได้ปกติ)
 
 ---
 
-## Scripts
+## Page Server Components ที่ต้องปรับ (เล็กน้อย)
 
-```bash
-npm run dev          # Dev server
-npm run build        # Production build
-npm run db:push      # Sync Prisma schema to DB
-npm run db:seed      # Seed initial data
-npm run db:studio    # Open Prisma Studio (GUI)
+### `app/return/page.tsx`
+ต้อง `searchParams.id` → fetch borrowing record → ส่งให้ `<ReturnForm>` —
+โครงเดิม support อยู่แล้ว, แต่ ReturnForm signature เปลี่ยน เป็น `{ record }` (props เดียว)
+
+### `app/admin/dashboard/page.tsx`
+ส่ง `records`, `users`, `currentUserId` (เดิมส่งแบบไหนก็ปรับตาม signature ของ `AdminDashboardClient`):
+
+```tsx
+<AdminDashboardClient
+  records={allRecords}
+  users={allUsers}
+  currentUserId={session.userId}
+/>
 ```
 
 ---
 
-## โครงสร้างไฟล์
+## Tokens สำหรับนักพัฒนา
 
-```
-machine-borrow/
-├── app/
-│   ├── api/
-│   │   ├── auth/login/route.ts
-│   │   ├── auth/logout/route.ts
-│   │   ├── records/route.ts
-│   │   └── admin/users/[id]/route.ts
-│   ├── login/
-│   │   ├── page.tsx          ← หน้า Login
-│   │   └── LoginForm.tsx
-│   ├── dashboard/
-│   │   └── page.tsx          ← Dashboard
-│   ├── form/
-│   │   ├── page.tsx          ← หน้าฟอร์ม
-│   │   └── RecordForm.tsx
-│   ├── admin/dashboard/
-│   │   ├── page.tsx          ← Admin Dashboard
-│   │   └── AdminActions.tsx
-│   ├── globals.css
-│   ├── layout.tsx
-│   └── page.tsx              ← Redirect
-├── components/
-│   ├── Navbar.tsx
-│   └── Footer.tsx
-├── lib/
-│   ├── auth.ts               ← JWT utils
-│   ├── prisma.ts             ← Prisma client
-│   └── time.ts               ← Time calculations
-├── prisma/
-│   ├── schema.prisma
-│   └── seed.ts
-├── middleware.ts             ← Route protection
-├── .env
-└── package.json
-```
+| Token | Dark | Light | ใช้ทำอะไร |
+|---|---|---|---|
+| `bg-ink` | `#0A0C10` | `#F5F2EA` | Background หลัก |
+| `bg-surface` | `#14171F` | `#FFFFFF` | Card |
+| `bg-panel` | `#1B1E28` | `#FAF7EE` | Elevated panel |
+| `text-light` | `#F3F1EA` | `#0C0E12` | Text หลัก |
+| `text-muted` | `#7C8090` | `#6B6E78` | Text รอง |
+| `bg-accent` | `#C4FF3E` | `#C4FF3E` | Accent (กระทบทั้ง 2 theme) |
+| `text-accent-ink` | `#0C0E12` | `#0C0E12` | Text บน accent |
+| `text-accent2` | `#FF6B65` | `#D9342B` | Danger |
+
+หลังจาก port แล้วถ้าอยากเปลี่ยน accent ทั้งระบบ — แก้ `--c-accent` ใน `globals.css` ที่เดียวพอ

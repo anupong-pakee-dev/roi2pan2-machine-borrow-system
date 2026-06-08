@@ -15,7 +15,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const records = await prisma.record.findMany({ orderBy: { createdAt: 'asc' } })
+  const from = req.nextUrl.searchParams.get('from')
+  const to = req.nextUrl.searchParams.get('to')
+
+  const where: { createdAt?: { gte?: Date; lte?: Date } } = {}
+  if (from) {
+    where.createdAt = { ...where.createdAt, gte: new Date(from + 'T00:00:00+07:00') }
+  }
+  if (to) {
+    where.createdAt = { ...where.createdAt, lte: new Date(to + 'T23:59:59+07:00') }
+  }
+
+  const records = await prisma.record.findMany({ where, orderBy: { createdAt: 'asc' } })
 
   // Full backup CSV with all fields including id and createdAt (ISO) for re-import
   const headers = [

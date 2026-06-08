@@ -5,7 +5,7 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get('token')?.value
   const { pathname } = req.nextUrl
 
-  const publicPaths = ['/login', '/api/auth/login']
+  const publicPaths = ['/login', '/api/auth/login', '/api/kiosk/']
   if (publicPaths.some(p => pathname.startsWith(p))) {
     return NextResponse.next()
   }

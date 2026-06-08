@@ -17,9 +17,9 @@ function todayThaiYM() {
   return todayThaiISO().slice(0, 7)
 }
 
-function IconSpinner() {
+function IconSpinner({ size = 4 }: { size?: number }) {
   return (
-    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+    <svg className={`animate-spin w-${size} h-${size}`} fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
     </svg>
@@ -85,34 +85,74 @@ function ExportModal({ onClose }: { onClose: () => void }) {
 
 /* ─── Backup Modal ─────────────────────────────────────────────────────── */
 function BackupModal({ totalRecords, onClose }: { totalRecords: number; onClose: () => void }) {
+  const [scope, setScope] = useState<'all' | 'range'>('all')
+  const [fromDate, setFromDate] = useState(todayThaiISO())
+  const [toDate, setToDate] = useState(todayThaiISO())
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [rangeError, setRangeError] = useState('')
 
   async function doBackup() {
+    if (scope === 'range' && fromDate > toDate) {
+      setRangeError('วันเริ่มต้นต้องไม่เกินวันสิ้นสุด')
+      return
+    }
+    setRangeError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/backup')
+      const url = scope === 'range'
+        ? `/api/admin/backup?from=${fromDate}&to=${toDate}`
+        : '/api/admin/backup'
+      const res = await fetch(url)
       if (!res.ok) { alert('สำรองข้อมูลไม่สำเร็จ'); return }
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
+      const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `backup-${todayThaiISO()}.csv`
+      a.href = objUrl
+      a.download = scope === 'range'
+        ? `backup-${fromDate}-ถึง-${toDate}.csv`
+        : `backup-${todayThaiISO()}.csv`
       a.click()
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(objUrl)
       setDone(true)
     } finally { setLoading(false) }
   }
 
   return (
     <Overlay onClose={onClose}>
-      <ModalHeader icon="💾" title="สำรองข้อมูล" sub="ดาวน์โหลด backup ทั้งหมดเป็นไฟล์ CSV" />
+      <ModalHeader icon="💾" title="สำรองข้อมูล" sub="ดาวน์โหลด backup เป็นไฟล์ CSV" />
 
-      <div className="bg-panel rounded-xl p-4 border border-border text-sm space-y-2 mb-5">
-        <InfoRow label="จำนวนรายการ" value={`${totalRecords.toLocaleString()} รายการ`} />
-        <InfoRow label="รูปแบบไฟล์" value="CSV (UTF-8)" />
-        <InfoRow label="นำเข้ากลับได้" value="✅ ผ่านแท็บ นำเข้าข้อมูล" />
+      <div className="flex gap-1 bg-panel border border-border rounded-xl p-1 mb-4">
+        {(['all', 'range'] as const).map(s => (
+          <button key={s} onClick={() => { setScope(s); setDone(false); setRangeError('') }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${scope === s ? 'bg-accent text-ink' : 'text-muted hover:text-light'}`}>
+            {s === 'all' ? '📦 ทั้งหมด' : '📅 เลือกช่วงวัน'}
+          </button>
+        ))}
       </div>
+
+      {scope === 'all' ? (
+        <div className="bg-panel rounded-xl p-4 border border-border text-sm space-y-2 mb-5">
+          <InfoRow label="จำนวนรายการ" value={`${totalRecords.toLocaleString()} รายการ`} />
+          <InfoRow label="รูปแบบไฟล์" value="CSV (UTF-8)" />
+          <InfoRow label="นำเข้ากลับได้" value="✅ ผ่านแท็บ นำเข้าข้อมูล" />
+        </div>
+      ) : (
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="label">ตั้งแต่วันที่</label>
+            <ThaiDatePicker value={fromDate} onChange={v => { setFromDate(v); setDone(false); setRangeError('') }} />
+          </div>
+          <div>
+            <label className="label">ถึงวันที่</label>
+            <ThaiDatePicker value={toDate} onChange={v => { setToDate(v); setDone(false); setRangeError('') }} />
+          </div>
+          {rangeError && <p className="text-xs text-accent2 mt-1">{rangeError}</p>}
+          <div className="bg-panel rounded-xl p-3 border border-border text-xs text-muted">
+            รูปแบบไฟล์: CSV (UTF-8) · นำเข้ากลับได้ผ่านแท็บ นำเข้าข้อมูล
+          </div>
+        </div>
+      )}
 
       {done && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-green-400 text-sm mb-4">
@@ -154,6 +194,29 @@ function ImportModal({ onClose }: { onClose: () => void }) {
     finally { setLoading(false) }
   }
 
+  if (loading) {
+    return (
+      <Overlay onClose={() => {}}>
+        <div className="flex flex-col items-center gap-5 py-6">
+          <svg className="animate-spin w-14 h-14 text-green-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={3} />
+            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <div className="text-center">
+            <p className="text-light font-semibold text-base">กำลังนำเข้าข้อมูล...</p>
+            <p className="text-muted text-sm mt-1.5">กรุณาอย่าปิดหน้าต่างนี้</p>
+            {file && (
+              <p className="text-xs text-muted/60 mt-2 font-mono truncate max-w-[260px]">{file.name}</p>
+            )}
+          </div>
+          <div className="w-full bg-border rounded-full h-1 overflow-hidden">
+            <div className="bg-green-400 h-full rounded-full w-3/4 animate-pulse" />
+          </div>
+        </div>
+      </Overlay>
+    )
+  }
+
   return (
     <Overlay onClose={onClose}>
       <ModalHeader icon="📥" title="นำเข้าข้อมูล" sub="กู้คืนจากไฟล์ backup" />
@@ -175,7 +238,9 @@ function ImportModal({ onClose }: { onClose: () => void }) {
           onChange={e => { setFile(e.target.files?.[0] || null); setResult(null); setError('') }} />
       </div>
 
-      {error && <div className="bg-accent2/10 border border-accent2/30 rounded-xl p-3 text-accent2 text-sm mb-4">{error}</div>}
+      {error && (
+        <div className="bg-accent2/10 border border-accent2/30 rounded-xl p-3 text-accent2 text-sm mb-4">{error}</div>
+      )}
       {result && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-green-400 text-sm mb-4">
           ✅ นำเข้าสำเร็จ <strong>{result.imported}</strong> รายการ
@@ -185,10 +250,10 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
       <div className="flex gap-2">
         <button onClick={onClose} className="btn-secondary flex-1 text-sm py-2.5">ปิด</button>
-        <button onClick={doImport} disabled={!file || loading}
+        <button onClick={doImport} disabled={!file}
           className="btn-primary flex-1 text-sm py-2.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? <IconSpinner /> : <span>⬆</span>}
-          {loading ? 'กำลังนำเข้า...' : 'นำเข้า'}
+          <span>⬆</span>
+          นำเข้า
         </button>
       </div>
     </Overlay>
@@ -198,6 +263,10 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 /* ─── Clear Modal ──────────────────────────────────────────────────────── */
 function ClearModal({ totalRecords, onCleared, onClose }: { totalRecords: number; onCleared: () => void; onClose: () => void }) {
   const router = useRouter()
+  const [scope, setScope] = useState<'all' | 'range'>('all')
+  const [fromDate, setFromDate] = useState(todayThaiISO())
+  const [toDate, setToDate] = useState(todayThaiISO())
+  const [rangeError, setRangeError] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(0)
@@ -206,11 +275,18 @@ function ClearModal({ totalRecords, onCleared, onClose }: { totalRecords: number
 
   async function doClear() {
     if (confirm !== PHRASE) return
+    if (scope === 'range' && fromDate > toDate) {
+      setRangeError('วันเริ่มต้นต้องไม่เกินวันสิ้นสุด')
+      return
+    }
+    setRangeError('')
     setLoading(true)
     try {
+      const body: Record<string, string> = { confirm: PHRASE }
+      if (scope === 'range') { body.from = fromDate; body.to = toDate }
       const res = await fetch('/api/admin/clear', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: PHRASE }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (res.ok) { setDone(data.deleted); onCleared(); router.refresh() }
@@ -235,9 +311,35 @@ function ClearModal({ totalRecords, onCleared, onClose }: { totalRecords: number
     <Overlay onClose={onClose}>
       <ModalHeader icon="⚠️" title="ล้างฐานข้อมูล" sub="การดำเนินการนี้ไม่สามารถยกเลิกได้" />
 
+      <div className="flex gap-1 bg-panel border border-border rounded-xl p-1 mb-4">
+        {(['all', 'range'] as const).map(s => (
+          <button key={s} onClick={() => { setScope(s); setRangeError(''); setConfirm('') }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${scope === s ? 'bg-accent2/20 text-accent2 border border-accent2/30' : 'text-muted hover:text-light border border-transparent'}`}>
+            {s === 'all' ? '🗑 ลบทั้งหมด' : '📅 เลือกช่วงวัน'}
+          </button>
+        ))}
+      </div>
+
+      {scope === 'range' && (
+        <div className="space-y-3 mb-4">
+          <div>
+            <label className="label">ตั้งแต่วันที่</label>
+            <ThaiDatePicker value={fromDate} onChange={v => { setFromDate(v); setRangeError('') }} />
+          </div>
+          <div>
+            <label className="label">ถึงวันที่</label>
+            <ThaiDatePicker value={toDate} onChange={v => { setToDate(v); setRangeError('') }} />
+          </div>
+          {rangeError && <p className="text-xs text-accent2 mt-1">{rangeError}</p>}
+        </div>
+      )}
+
       <div className="bg-accent2/5 border border-accent2/20 rounded-xl p-4 text-sm space-y-1.5 mb-5">
         <p className="text-accent2 font-semibold">สิ่งที่จะเกิดขึ้น:</p>
-        <p className="text-muted">• ลบข้อมูลบันทึกทั้งหมด <span className="text-accent2 font-bold">{totalRecords.toLocaleString()}</span> รายการ</p>
+        {scope === 'all'
+          ? <p className="text-muted">• ลบข้อมูลบันทึกทั้งหมด <span className="text-accent2 font-bold">{totalRecords.toLocaleString()}</span> รายการ</p>
+          : <p className="text-muted">• ลบข้อมูลในช่วง <span className="text-accent2 font-bold">{fromDate}</span> ถึง <span className="text-accent2 font-bold">{toDate}</span></p>
+        }
         <p className="text-muted">• บัญชีผู้ใช้จะไม่ถูกลบ</p>
         <p className="text-muted">• ข้อมูลจะหายถาวร ไม่สามารถกู้คืนได้</p>
       </div>
@@ -304,11 +406,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 /* ─── Action button in the grid ───────────────────────────────────────── */
 function ActionBtn({
-  icon, label, sub, color, onClick,
+  icon, label, sub, color, onClick, tutorialId,
 }: {
   icon: string; label: string; sub: string
   color: 'amber' | 'blue' | 'green' | 'red'
   onClick: () => void
+  tutorialId?: string
 }) {
   const colors = {
     amber: 'bg-amber-500/10 border-amber-500/20 hover:border-amber-400/50 hover:bg-amber-500/15',
@@ -326,6 +429,7 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
+      data-tutorial={tutorialId}
       className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border transition-all duration-150 active:scale-95 text-center ${colors[color]}`}
     >
       <span className="text-3xl">{icon}</span>
@@ -355,7 +459,7 @@ export default function DataManagementCard({ totalRecords }: Props) {
         />
       )}
 
-      <div className="card p-0 overflow-hidden">
+      <div data-tutorial="data-management" className="card p-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg shrink-0">
@@ -378,24 +482,28 @@ export default function DataManagementCard({ totalRecords }: Props) {
             icon="📊" label="Export Excel"
             sub="รายวัน หรือ รายเดือน"
             color="amber"
+            tutorialId="dm-export"
             onClick={() => setModal('export')}
           />
           <ActionBtn
             icon="💾" label="สำรองข้อมูล"
-            sub="ดาวน์โหลด backup ทั้งหมด"
+            sub="ดาวน์โหลด backup CSV"
             color="blue"
+            tutorialId="dm-backup"
             onClick={() => setModal('backup')}
           />
           <ActionBtn
             icon="📥" label="นำเข้าข้อมูล"
             sub="กู้คืนจากไฟล์ backup"
             color="green"
+            tutorialId="dm-import"
             onClick={() => setModal('import')}
           />
           <ActionBtn
             icon="🗑" label="ล้างฐานข้อมูล"
             sub="ลบข้อมูลทั้งหมด"
             color="red"
+            tutorialId="dm-clear"
             onClick={() => setModal('clear')}
           />
         </div>
