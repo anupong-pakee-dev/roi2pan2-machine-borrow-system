@@ -1,125 +1,144 @@
-# MachineLog — Redesign Port (Next.js 14 + Tailwind)
+# MachineLog — ระบบบันทึกการยืม-คืนเครื่อง
 
-ดีไซน์ใหม่แบบ **POS สำหรับร้านเกม** พร้อม Dark/Light theme + Filter system ครบ
-แปลงให้ใช้กับ codebase เดิม (`anupong-pakee-dev/roi2pan2-machine-borrow-system`) ได้ทันที
-
----
-
-## What's New
-
-### Visual
-- 🎨 **POS-style Machine Grid** — แตะเครื่องว่าง = ยืม, แตะเครื่องที่ใช้อยู่ = คืน
-- 🌗 **Dark / Light theme** — สลับด้วย ToggleButton บน Navbar (เก็บใน localStorage)
-- 🔤 **IBM Plex Sans Thai + IBM Plex Mono** — POS feel, ตัวเลขตรงกริด
-- 🟢 **Acid lime accent** (`#C4FF3E`) แทนสีส้มเดิม
-
-### UX
-- ⚡ **Quick Borrow / Quick Return modals** — ทำงานครบใน 2 คลิก
-- 🔍 **Filter Panel** ที่ Admin Dashboard:
-  - ช่วงเวลา: วันนี้ / เลือกวัน (date picker) / ทั้งหมด
-  - ค้นหา: เลขที่ / เครื่อง / หมายเหตุ (debounced)
-  - Machine chips
-  - วิธีชำระ: เงินสด / คูปอง / ค้างชำระ
-  - Result count + clear-all
-- 📊 **Stats cards** เปลี่ยนตาม filter
-
-### Technical
-- **CSS variables ใน `globals.css`** — `.theme-dark` / `.theme-light`
-- **Tailwind colors** อ้าง CSS vars → token names เดิม (`bg-surface`, `text-light` ฯลฯ) ยังใช้ได้
-- **Hot paths แยกไฟล์** — `<MachineTile>`, `<QuickBorrowModal>`, `<QuickReturnModal>`, `<FilterPanel>`, `<ClockBadge>`, `<ThemeToggle>`, `<ModalShell>`
-- API contracts (POST `/api/records`, PATCH `/api/records/:id`, DELETE ฯลฯ) **เหมือนเดิม** — ไม่ต้องแก้ backend / Prisma schema
+เว็บสำหรับบันทึกการยืม-คืนเครื่อง ที่รวมยอดนาที ยอดเงิน และเงินเซ็นให้เลย ไม่ต้องมานั่งรวมเองทีหลัง
 
 ---
 
-## File Tree (ส่วนที่เปลี่ยน)
+## ที่มาของโปรเจกต์
+
+ผมสร้างเว็บนี้ขึ้นมาเพื่อแก้ปัญหาการต้องมานั่งรวมยอดทีหลัง
+
+เดิมทีที่นั่นใช้สมุดในการจด ใครมายืมเครื่องก็จดลงสมุดไว้ก่อน พอขึ้นเช้าวันใหม่ก็ต้องมานั่งไล่รวมยอดของคนที่ยืมเครื่องทีละรายการ ทั้งนาทีที่ยืม ยอดเงิน และเงินเซ็นที่ยังค้างอยู่ วันไหนคนยืมเยอะก็ยิ่งใช้เวลานาน ทำให้กินเวลาค่อนข้างมาก
+
+ผมเลยแก้ด้วยการสร้างเว็บขึ้นมาใช้แทนสมุด ตอนยืมกับตอนคืนก็กดบันทึกในเว็บ แล้วยอดทั้งหมดจะถูกรวมให้เอง เปิดดูได้ทันทีโดยไม่ต้องรอมานั่งรวมตอนเช้า ซึ่งพอเอามาใช้จริงก็ตอบโจทย์กับปัญหานั้น
+
+## วิธีการพัฒนา
+
+เว็บนี้ผมใช้ AI ช่วยทำ ตัวโค้ดใช้ AI generate ขึ้นมา ส่วน UX/UI ก็ใช้ AI ออกแบบเหมือนกัน
+
+ส่วนของผมคือเป็นคนบรีฟว่าต้องการอะไร ใช้งานหน้างานจริงเป็นแบบไหน แล้วรีวิวสิ่งที่ AI ทำออกมา ทดสอบว่าใช้ได้จริงไหม และแก้ปัญหาที่เจอระหว่างทางจนใช้งานได้
+
+---
+
+## ฟีเจอร์
+
+### หน้าจอเครื่อง (พนักงาน)
+- **Machine Grid แบบ POS** — แตะเครื่องว่างเพื่อเริ่มยืม แตะเครื่องที่ใช้อยู่เพื่อคืน
+- **Quick Borrow / Quick Return** — บันทึกยืม-คืนจบใน modal เดียว รองรับเงินสด คูปอง เงินเซ็น และเงินทอน
+- **สรุปยอดวันนี้** — เครื่องที่ใช้งานอยู่, จำนวนรายการ, นาทีรวม, ยอดสุทธิ
+- กรองดูเครื่อง: ทั้งหมด / ใช้งานอยู่ / ว่าง
+- รายการล่าสุด 10 รายการ
+
+### หน้าแอดมิน
+- **รวมยอดอัตโนมัติ** — ยอดสุทธิ (หักหนี้), หนี้ค้างชำระ, นาทีรวม, คูปองที่ใช้
+- **ตัวกรอง** — วันนี้ / วันเดียว / ช่วงวัน / ทั้งหมด พร้อมกรองตามเครื่อง วิธีชำระ และค้นหา
+- **จ่ายย้อนหลัง** — บันทึกการชำระเงินเซ็นทีละรายการ หรือเลือกหลายรายการแล้วจ่ายรวม
+- **จัดอันดับ** — หนี้สูงสุด / จ่ายมากสุด แยกตามเลขที่ พร้อม export CSV
+- **จัดการข้อมูล** — Export รายวัน/รายเดือน (CSV เปิดด้วย Excel ได้), Backup, Import, ล้างฐานข้อมูล
+- จัดการผู้ใช้ (เพิ่ม/ลบ) และจัดการรายชื่อเครื่อง
+
+### อื่น ๆ
+- สิทธิ์ 2 ระดับ: `admin` (จัดการได้ทั้งหมด) และ `staff` (บันทึกยืม-คืน และดูรายงานแบบอ่านอย่างเดียว)
+- Dark / Light theme
+- Tutorial แนะนำการใช้งานในตัว (กดปุ่ม `?` มุมล่างขวา)
+- รองรับมือถือและแท็บเล็ต
+
+---
+
+## Tech Stack
+
+- **Next.js 14** (App Router) + **React 18** + **TypeScript**
+- **Tailwind CSS**
+- **Prisma** + **PostgreSQL** (ใช้กับ [Neon](https://neon.tech) ได้)
+- Auth: JWT (`jose`) เก็บใน cookie + `bcryptjs`
+
+---
+
+## การติดตั้ง
+
+ต้องมี Node.js 18.17 ขึ้นไป และฐานข้อมูล PostgreSQL
+
+**1. ติดตั้ง dependencies**
+
+```bash
+npm install
+```
+
+**2. สร้างไฟล์ `.env`** ที่ root ของโปรเจกต์
+
+```env
+# connection string หลัก (ถ้าใช้ Neon ให้ใช้แบบ pooled)
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE"
+
+# connection ตรง ไม่ผ่าน pooler — Prisma ใช้ตอนสร้าง/แก้ตาราง
+# ถ้าไม่ได้ใช้ pooler ให้ใส่ค่าเดียวกับ DATABASE_URL
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE"
+
+# string สุ่มยาว ๆ สำหรับเซ็น session
+JWT_SECRET="change-this-to-a-long-random-secret-string"
+```
+
+> `DIRECT_URL` จำเป็นต้องมี แต่ยังไม่อยู่ใน `.env.example` — ต้องเพิ่มเอง
+
+**3. สร้างตารางในฐานข้อมูล**
+
+```bash
+npm run db:push
+```
+
+**4. สร้างผู้ใช้เริ่มต้น**
+
+```bash
+npm run db:seed
+```
+
+จะได้บัญชี `admin` / `admin1234` และ `staff` / `staff1234`
+**ควรเปลี่ยนรหัสผ่านทันที** โดยเฉพาะถ้าเปิดให้เข้าถึงจากอินเทอร์เน็ต
+
+**5. รัน**
+
+```bash
+npm run dev
+```
+
+เปิด http://localhost:3000 (dev server เปิดรับจากเครื่องอื่นในวง LAN ด้วย เพื่อให้ใช้จากแท็บเล็ต/มือถือในร้านได้)
+
+### คำสั่งอื่น ๆ
+
+| คำสั่ง | ทำอะไร |
+|---|---|
+| `npm run build` | build สำหรับ production |
+| `npm run start` | รัน production build |
+| `npm run db:studio` | เปิด Prisma Studio ดู/แก้ข้อมูล |
+
+---
+
+## โครงสร้างโปรเจกต์
 
 ```
 app/
-├── globals.css                  ← เขียนใหม่ (CSS vars, theme switch)
-├── layout.tsx                   ← เพิ่ม class="theme-dark" บน <html>
-├── login/
-│   ├── page.tsx                 ← split hero/form layout
-│   └── LoginForm.tsx            ← เขียนใหม่ + ปุ่ม "กรอกให้"
-├── dashboard/
-│   ├── page.tsx                 ← เดิม (server-side fetch)
-│   └── DashboardClient.tsx      ← เขียนใหม่ — Machine Grid
-├── form/
-│   ├── page.tsx                 ← เดิม
-│   └── RecordForm.tsx           ← เขียนใหม่ — POS picker
-├── return/
-│   ├── page.tsx                 ← เดิม
-│   └── ReturnForm.tsx           ← เขียนใหม่ — coupon presets + calc
-└── admin/dashboard/
-    ├── page.tsx                 ← เดิม
-    └── AdminDashboardClient.tsx ← เขียนใหม่ — Filter Panel
-
-components/
-├── Navbar.tsx                   ← เขียนใหม่ + clock + theme toggle
-├── Footer.tsx                   ← minor
-├── ClockBadge.tsx               ← ใหม่
-├── ThemeToggle.tsx              ← ใหม่
-├── MachineTile.tsx              ← ใหม่
-├── ModalShell.tsx               ← ใหม่
-├── QuickBorrowModal.tsx         ← ใหม่
-├── QuickReturnModal.tsx         ← ใหม่
-└── FilterPanel.tsx              ← ใหม่
-
-lib/
-└── format.ts                    ← ใหม่ (time / date helpers)
-
-tailwind.config.js               ← ขยาย token + CSS vars
+├── login/              หน้าเข้าสู่ระบบ
+├── dashboard/          หน้าจอเครื่อง (ยืม-คืน)
+├── form/, return/      ฟอร์มบันทึกยืม / คืน แบบเต็มหน้า
+├── staff/dashboard/    รายงานแบบอ่านอย่างเดียวสำหรับ staff
+├── admin/dashboard/    รายงาน, จ่ายย้อนหลัง, จัดอันดับ, จัดการข้อมูล/ผู้ใช้
+└── api/                records, machines, auth, admin, kiosk
+components/             MachineTile, QuickBorrowModal, QuickReturnModal, FilterPanel ฯลฯ
+lib/                    auth (JWT), prisma client, ตัวช่วยจัดรูปแบบเวลา
+prisma/                 schema.prisma, seed.ts
+middleware.ts           ตรวจ session และสิทธิ์ admin
 ```
 
-ไฟล์ที่ **ไม่ต้องแก้:**
-- API routes ทั้งหมดใน `app/api/`
-- `prisma/schema.prisma`, `lib/prisma.ts`, `lib/auth.ts`
-- `middleware.ts`
+## โครงสร้างข้อมูล
+
+| ตาราง | เก็บอะไร |
+|---|---|
+| `Record` | รายการยืม-คืน: เลขที่, เครื่อง, เวลายืม/คืน, นาที, บาท, คูปอง, หนี้, เงินทอน, หมายเหตุ |
+| `Machine` | รายชื่อเครื่อง |
+| `User` | ผู้ใช้และสิทธิ์ (`admin` / `staff`) |
 
 ---
 
-## วิธีนำไป Apply
+## License
 
-1. Clone repo เดิม
-2. Copy ทุกไฟล์ใน folder `nextjs/` นี้ทับลงไปใน repo (กลายเป็น root)
-3. `npm install` (ไม่มี dependency เพิ่ม)
-4. `npm run dev`
-
-### หมายเหตุ — มี `/api/admin/users` (POST) ไหม?
-ในส่วน Admin > Add User เรียก `POST /api/admin/users` — ถ้า repo ยังไม่มี route นี้ ให้เพิ่ม
-หรือลบฟังก์ชัน Add User ออกจาก `AdminDashboardClient.tsx` ก็ได้ (ส่วนอื่นทำงานได้ปกติ)
-
----
-
-## Page Server Components ที่ต้องปรับ (เล็กน้อย)
-
-### `app/return/page.tsx`
-ต้อง `searchParams.id` → fetch borrowing record → ส่งให้ `<ReturnForm>` —
-โครงเดิม support อยู่แล้ว, แต่ ReturnForm signature เปลี่ยน เป็น `{ record }` (props เดียว)
-
-### `app/admin/dashboard/page.tsx`
-ส่ง `records`, `users`, `currentUserId` (เดิมส่งแบบไหนก็ปรับตาม signature ของ `AdminDashboardClient`):
-
-```tsx
-<AdminDashboardClient
-  records={allRecords}
-  users={allUsers}
-  currentUserId={session.userId}
-/>
-```
-
----
-
-## Tokens สำหรับนักพัฒนา
-
-| Token | Dark | Light | ใช้ทำอะไร |
-|---|---|---|---|
-| `bg-ink` | `#0A0C10` | `#F5F2EA` | Background หลัก |
-| `bg-surface` | `#14171F` | `#FFFFFF` | Card |
-| `bg-panel` | `#1B1E28` | `#FAF7EE` | Elevated panel |
-| `text-light` | `#F3F1EA` | `#0C0E12` | Text หลัก |
-| `text-muted` | `#7C8090` | `#6B6E78` | Text รอง |
-| `bg-accent` | `#C4FF3E` | `#C4FF3E` | Accent (กระทบทั้ง 2 theme) |
-| `text-accent-ink` | `#0C0E12` | `#0C0E12` | Text บน accent |
-| `text-accent2` | `#FF6B65` | `#D9342B` | Danger |
-
-หลังจาก port แล้วถ้าอยากเปลี่ยน accent ทั้งระบบ — แก้ `--c-accent` ใน `globals.css` ที่เดียวพอ
+ดูที่ [LICENSE](LICENSE)
